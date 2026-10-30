@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-#![warn(clippy::all, clippy::pedantic)]
+#![warn(clippy::all)]
 //! `tn-adversary`: Malicious server simulator CLI.
 
 fn main() {

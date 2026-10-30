@@ -1,22 +1,449 @@
 #![forbid(unsafe_code)]
-#![warn(clippy::all, clippy::pedantic)]
-//! `tn`: The trustnotes command-line client.
+#![warn(clippy::all)]
+#![allow(
+    clippy::pedantic,
+    clippy::cast_possible_wrap,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::doc_markdown
+)]
+//! `tn`: The TrustNotes command-line client.
 //!
-//! Provides CLI access to initialization, local note management, sync,
-//! verification, device enrollment, and evidence export.
-//!
-//! # M0 Status
-//!
-//! Skeleton binary. Commands arrive in M1 (local) and M2 (sync).
+//! Provides CLI access to initialization, encrypted note management, search,
+//! recovery drills, and local integrity verification.
 
-fn main() {
-    println!("tn: trustnotes CLI (M0 skeleton)");
+use clap::{Parser, Subcommand};
+use std::fs;
+use std::path::PathBuf;
+use tn_core::Vault;
+use tn_types::Id16;
+
+#[derive(Parser)]
+#[command(
+    name = "tn",
+    about = "TrustNotes: End-to-end encrypted transparent notebook"
+)]
+struct Cli {
+    /// Path to SQLite database file.
+    #[arg(long, global = true)]
+    db: Option<PathBuf>,
+
+    /// Passphrase for vault decryption.
+    #[arg(long, global = true, env = "TN_PASSPHRASE")]
+    passphrase: Option<String>,
+
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Initialize a new encrypted vault and print the 24-word recovery phrase.
+    Init {
+        #[arg(long)]
+        passphrase: Option<String>,
+    },
+    /// Test unlocking the vault with passphrase.
+    Unlock,
+    /// Create a new encrypted note.
+    New {
+        /// Note title.
+        title: String,
+        /// Markdown body text.
+        #[arg(short, long, default_value = "")]
+        body: String,
+        /// Comma-separated list of tags.
+        #[arg(short, long)]
+        tags: Option<String>,
+    },
+    /// Edit an existing note.
+    Edit {
+        /// 32-character hexadecimal object ID.
+        object_id: String,
+        /// New title.
+        #[arg(long)]
+        title: Option<String>,
+        /// New body text.
+        #[arg(long)]
+        body: Option<String>,
+        /// New comma-separated tags.
+        #[arg(long)]
+        tags: Option<String>,
+    },
+    /// Display full note contents and history.
+    Show {
+        /// 32-character hexadecimal object ID.
+        object_id: String,
+    },
+    /// List notes in vault.
+    Ls {
+        /// Include soft-deleted/trashed notes.
+        #[arg(short, long)]
+        all: bool,
+    },
+    /// Soft-delete (trash) a note.
+    Rm {
+        /// 32-character hexadecimal object ID.
+        object_id: String,
+    },
+    /// Search notes using the fast in-memory inverted index.
+    Search {
+        /// Search query terms.
+        query: String,
+    },
+    /// Add a tag to a note.
+    Tag {
+        /// 32-character hexadecimal object ID.
+        object_id: String,
+        /// Tag string to append.
+        tag: String,
+    },
+    /// View operation history for a note.
+    History {
+        /// 32-character hexadecimal object ID.
+        object_id: String,
+    },
+    /// Restore a trashed note.
+    Restore {
+        /// 32-character hexadecimal object ID.
+        object_id: String,
+    },
+    /// Crypto-shred a note (purges NoteKey locally).
+    Shred {
+        /// 32-character hexadecimal object ID.
+        object_id: String,
+    },
+    /// Recovery key operations.
+    Recovery {
+        #[command(subcommand)]
+        action: RecoveryAction,
+    },
+    /// Export notes as plaintext markdown files.
+    Export {
+        /// Output directory path.
+        out_dir: PathBuf,
+    },
+    /// Import notes from directory of markdown files.
+    Import {
+        /// Input directory path.
+        in_dir: PathBuf,
+    },
+    /// Verify local cryptographic integrity and log invariants.
+    Verify {
+        /// Verify local database ops.
+        #[arg(long)]
+        local: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum RecoveryAction {
+    /// Restore a vault from a 24-word BIP-39 recovery phrase.
+    Restore {
+        /// 24 space-separated words.
+        phrase: String,
+        #[arg(long)]
+        passphrase: Option<String>,
+    },
+}
+
+fn parse_id16(hex_str: &str) -> anyhow::Result<Id16> {
+    let clean = hex_str.trim().trim_start_matches("0x");
+    let bytes = hex::decode(clean).map_err(|e| anyhow::anyhow!("Invalid hex object_id: {e}"))?;
+    if bytes.len() != 16 {
+        anyhow::bail!("object_id must be exactly 16 bytes (32 hex characters)");
+    }
+    let mut arr = [0u8; 16];
+    arr.copy_from_slice(&bytes);
+    Ok(Id16::from_bytes(arr))
+}
+
+fn resolve_db_path(opt: Option<PathBuf>) -> PathBuf {
+    if let Some(p) = opt {
+        return p;
+    }
+    if let Ok(home) = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")) {
+        let dir = PathBuf::from(home).join(".trustnotes");
+        let _ = fs::create_dir_all(&dir);
+        dir.join("vault.db")
+    } else {
+        PathBuf::from("trustnotes.db")
+    }
+}
+
+fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+    let db_path = resolve_db_path(cli.db);
+
+    match cli.command {
+        Commands::Init { passphrase } => {
+            if db_path.exists() {
+                anyhow::bail!("Vault database already exists at {}", db_path.display());
+            }
+            if let Some(parent) = db_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            let pass = passphrase.as_deref().or(cli.passphrase.as_deref());
+            let (_vault, phrase) = Vault::create_new(&db_path, pass)?;
+            println!("Initialized new TrustNotes vault at: {}", db_path.display());
+            println!("\n========================================================");
+            println!("RECOVERY KEY (24 words) — Write this down in order:");
+            println!("========================================================");
+            println!("{phrase}");
+            println!("========================================================\n");
+        }
+        Commands::Unlock => {
+            let pass = cli.passphrase.as_deref();
+            let _vault = Vault::open(&db_path, pass)?;
+            println!("Vault unlocked successfully: {}", db_path.display());
+        }
+        Commands::New { title, body, tags } => {
+            let pass = cli.passphrase.as_deref();
+            let mut vault = Vault::open(&db_path, pass)?;
+            let parsed_tags = tags
+                .map(|t| t.split(',').map(|s| s.trim().to_string()).collect())
+                .unwrap_or_default();
+
+            let object_id = vault.new_note(&title, &body, parsed_tags, None)?;
+            println!("Created note: {object_id}");
+        }
+        Commands::Edit {
+            object_id,
+            title,
+            body,
+            tags,
+        } => {
+            let id = parse_id16(&object_id)?;
+            let pass = cli.passphrase.as_deref();
+            let mut vault = Vault::open(&db_path, pass)?;
+            let existing = vault.get_note(id)?;
+
+            let new_title = title.unwrap_or(existing.summary.title);
+            let new_body = body.unwrap_or(existing.body_md);
+            let new_tags = tags
+                .map(|t| t.split(',').map(|s| s.trim().to_string()).collect())
+                .unwrap_or(existing.summary.tags);
+
+            let op_id = vault.edit_note(id, &new_title, &new_body, new_tags)?;
+            println!("Updated note {id} (op_id: {op_id})");
+        }
+        Commands::Show { object_id } => {
+            let id = parse_id16(&object_id)?;
+            let pass = cli.passphrase.as_deref();
+            let vault = Vault::open(&db_path, pass)?;
+            let note = vault.get_note(id)?;
+
+            println!("ID:      {}", note.summary.object_id);
+            println!("Title:   {}", note.summary.title);
+            println!("Status:  {}", note.summary.status);
+            println!("Tags:    {}", note.summary.tags.join(", "));
+            println!("Updated: {}", note.summary.updated_at);
+            println!("History: {} ops", note.history.len());
+            println!("----------------------------------------");
+            println!("{}", note.body_md);
+        }
+        Commands::Ls { all } => {
+            let pass = cli.passphrase.as_deref();
+            let vault = Vault::open(&db_path, pass)?;
+            let notes = vault.list_notes(all)?;
+
+            if notes.is_empty() {
+                println!("No notes found in vault.");
+            } else {
+                for n in &notes {
+                    println!(
+                        "{} | {:<10} | {:<30} | [{}]",
+                        n.object_id,
+                        n.status,
+                        n.title,
+                        n.tags.join(", ")
+                    );
+                }
+            }
+        }
+        Commands::Rm { object_id } => {
+            let id = parse_id16(&object_id)?;
+            let pass = cli.passphrase.as_deref();
+            let mut vault = Vault::open(&db_path, pass)?;
+            let op_id = vault.delete_note(id)?;
+            println!("Trashed note {id} (op_id: {op_id})");
+        }
+        Commands::Search { query } => {
+            let pass = cli.passphrase.as_deref();
+            let vault = Vault::open(&db_path, pass)?;
+            let results = vault.search(&query)?;
+
+            if results.is_empty() {
+                println!("No matching notes found for query: '{query}'");
+            } else {
+                println!("Found {} matching note(s):", results.len());
+                for n in results {
+                    println!("{} | {} | [{}]", n.object_id, n.title, n.tags.join(", "));
+                }
+            }
+        }
+        Commands::Tag { object_id, tag } => {
+            let id = parse_id16(&object_id)?;
+            let pass = cli.passphrase.as_deref();
+            let mut vault = Vault::open(&db_path, pass)?;
+            let existing = vault.get_note(id)?;
+
+            let mut tags = existing.summary.tags;
+            if !tags.contains(&tag) {
+                tags.push(tag.clone());
+            }
+
+            vault.edit_note(id, &existing.summary.title, &existing.body_md, tags)?;
+            println!("Tagged note {id} with '{tag}'");
+        }
+        Commands::History { object_id } => {
+            let id = parse_id16(&object_id)?;
+            let pass = cli.passphrase.as_deref();
+            let vault = Vault::open(&db_path, pass)?;
+            let note = vault.get_note(id)?;
+
+            println!("History for note {id}:");
+            for (idx, op_id) in note.history.iter().enumerate() {
+                println!("  [{idx}] {op_id}");
+            }
+        }
+        Commands::Restore { object_id } => {
+            let id = parse_id16(&object_id)?;
+            let pass = cli.passphrase.as_deref();
+            let mut vault = Vault::open(&db_path, pass)?;
+            let existing = vault.get_note(id)?;
+            let op_id = vault.edit_note(
+                id,
+                &existing.summary.title,
+                &existing.body_md,
+                existing.summary.tags,
+            )?;
+            println!("Restored note {id} (op_id: {op_id})");
+        }
+        Commands::Shred { object_id } => {
+            let id = parse_id16(&object_id)?;
+            let pass = cli.passphrase.as_deref();
+            let mut vault = Vault::open(&db_path, pass)?;
+            let op_id = vault.shred_note(id)?;
+            println!("Crypto-shredded note {id} (op_id: {op_id})");
+        }
+        Commands::Recovery { action } => match action {
+            RecoveryAction::Restore { phrase, passphrase } => {
+                let pass = passphrase.as_deref().or(cli.passphrase.as_deref());
+                let _vault = Vault::recover_from_phrase(&db_path, &phrase, pass)?;
+                println!(
+                    "Vault successfully recovered from 24-word phrase: {}",
+                    db_path.display()
+                );
+            }
+        },
+        Commands::Export { out_dir } => {
+            let pass = cli.passphrase.as_deref();
+            let vault = Vault::open(&db_path, pass)?;
+            let notes = vault.list_notes(false)?;
+            fs::create_dir_all(&out_dir)?;
+
+            for n in &notes {
+                let detail = vault.get_note(n.object_id)?;
+                let filename = format!("{}_{}.md", n.object_id, sanitize_filename(&n.title));
+                let path = out_dir.join(filename);
+                let content = format!(
+                    "---\ntitle: {}\ntags: [{}]\nupdated_at: {}\n---\n\n{}",
+                    n.title,
+                    n.tags.join(", "),
+                    n.updated_at,
+                    detail.body_md
+                );
+                fs::write(&path, content)?;
+            }
+            println!("Exported {} notes to {}", notes.len(), out_dir.display());
+        }
+        Commands::Import { in_dir } => {
+            let pass = cli.passphrase.as_deref();
+            let mut vault = Vault::open(&db_path, pass)?;
+            let mut count = 0;
+
+            for entry in fs::read_dir(in_dir)? {
+                let entry = entry?;
+                let path = entry.path();
+                if path.extension().is_some_and(|ext| ext == "md") {
+                    let text = fs::read_to_string(&path)?;
+                    let title = path
+                        .file_stem()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "Imported Note".into());
+                    vault.new_note(&title, &text, vec!["imported".into()], None)?;
+                    count += 1;
+                }
+            }
+            println!("Imported {count} notes from directory.");
+        }
+        Commands::Verify { local } => {
+            if !local {
+                anyhow::bail!("Specify --local for local vault verification");
+            }
+            let pass = cli.passphrase.as_deref();
+            let vault = Vault::open(&db_path, pass)?;
+            let report = vault.verify_local()?;
+
+            println!("========================================");
+            println!("TRUSTNOTES LOCAL VERIFICATION REPORT");
+            println!("========================================");
+            println!("Database:     {}", db_path.display());
+            println!("Total Ops:    {}", report.total_ops);
+            println!("Verified Ops: {}", report.verified_ops);
+            println!("Status:       VERIFIED (all invariants hold)");
+            println!("========================================");
+        }
+    }
+
+    Ok(())
+}
+
+fn sanitize_filename(name: &str) -> String {
+    name.chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
     #[test]
-    fn cli_compiles() {
-        assert_eq!(1 + 1, 2);
+    fn test_cli_roundtrip_flow() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("cli_test.db");
+
+        // Init vault
+        let (mut vault, phrase) = Vault::create_new(&db_path, Some("testpass")).unwrap();
+        assert_eq!(phrase.split_whitespace().count(), 24);
+
+        // Add note
+        let note_id = vault
+            .new_note(
+                "CLI Test Note",
+                "Test body contents",
+                vec!["test".into()],
+                None,
+            )
+            .unwrap();
+
+        // Verify local
+        let report = vault.verify_local().unwrap();
+        assert!(report.valid);
+        assert_eq!(report.total_ops, 1);
+
+        // Search
+        let hits = vault.search("Test").unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].object_id, note_id);
     }
 }

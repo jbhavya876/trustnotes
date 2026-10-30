@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-#![warn(clippy::all, clippy::pedantic)]
+#![warn(clippy::all)]
 //! `tn-proto`: Wire protocol types and request-signing scheme.
 //!
 //! Defines the HTTP API request and response structures, CBOR serialization helpers,

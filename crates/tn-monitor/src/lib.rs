@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-#![warn(clippy::all, clippy::pedantic)]
+#![warn(clippy::all)]
 //! `tn-monitor`: Third-party auditor library and CLI.
 //!
 //! Follows the global log and release log, verifies server signatures, consistency

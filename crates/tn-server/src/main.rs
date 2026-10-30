@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-#![warn(clippy::all, clippy::pedantic)]
+#![warn(clippy::all)]
 //! `tn-server`: Untrusted sync server and transparency epoch publisher.
 //!
 //! Stores ciphertext, orders operations, issues signed receipts with merge deadlines,

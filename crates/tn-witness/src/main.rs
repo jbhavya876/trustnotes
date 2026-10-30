@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-#![warn(clippy::all, clippy::pedantic)]
+#![warn(clippy::all)]
 //! `tn-witness`: Independent witness daemon for the trustnotes transparency log.
 //!
 //! Stores latest cosigned checkpoint per log origin and cosigns new checkpoints

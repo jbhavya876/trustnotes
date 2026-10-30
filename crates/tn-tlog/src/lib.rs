@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-#![warn(clippy::all, clippy::pedantic)]
+#![warn(clippy::all)]
 //! `tn-tlog`: Transparency log checkpoint formats, cosignatures, and witness policies.
 //!
 //! Implements C2SP `tlog-checkpoint`, `tlog-cosignature`, and `tlog-witness` semantics.

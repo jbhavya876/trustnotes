@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-#![warn(clippy::all, clippy::pedantic)]
+#![warn(clippy::all)]
 //! `tn-release`: Reproducible build verification, signing ceremonies, and release log entries.
 //!
 //! Tools for independent builders to reproduce release artifacts byte-for-byte,

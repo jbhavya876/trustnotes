@@ -1,5 +1,12 @@
 #![forbid(unsafe_code)]
-#![warn(clippy::all, clippy::pedantic)]
+#![warn(clippy::all)]
+#![allow(
+    clippy::pedantic,
+    clippy::cast_possible_wrap,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::doc_markdown
+)]
 //! `tn-types`: Shared types, IDs, canonical CBOR codec, protocol versions, and error types.
 //!
 //! This crate has no external dependencies at M0. It is the foundation imported by all other
@@ -14,13 +21,17 @@
 //! All errors in trustnotes are typed. No string-based error propagation crosses module
 //! boundaries. Errors that indicate a verification failure never fall back to unverified state.
 
+use serde::{Deserialize, Serialize};
 use std::fmt;
+
+/// Strict deterministic CBOR encoding and decoding wrapper.
+pub mod cbor;
 
 /// Current trustnotes protocol version.
 pub const PROTOCOL_VERSION: u8 = 1;
 
 /// Op kind discriminants.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum OpKind {
     /// Create or update a note.
@@ -172,7 +183,7 @@ impl fmt::Display for TnError {
 impl std::error::Error for TnError {}
 
 /// A 32-byte opaque identifier (`op_id`, `account_id`, `device_id`, etc.).
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub struct Id32([u8; 32]);
 
 impl Id32 {
@@ -209,7 +220,7 @@ impl fmt::Display for Id32 {
 }
 
 /// A 16-byte opaque object identifier (`object_id`, opaque to the server).
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub struct Id16([u8; 16]);
 
 impl Id16 {

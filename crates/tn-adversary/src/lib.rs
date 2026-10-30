@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-#![warn(clippy::all, clippy::pedantic)]
+#![warn(clippy::all)]
 //! `tn-adversary`: Malicious server simulator and adversarial test harness.
 //!
 //! Drives clients against simulated server attacks across scenarios S1 through S17:

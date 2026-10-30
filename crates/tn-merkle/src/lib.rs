@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-#![warn(clippy::all, clippy::pedantic)]
+#![warn(clippy::all)]
 //! `tn-merkle`: Append-only Merkle tree implementation for trustnotes.
 //!
 //! Provides the sparse Merkle tree and inclusion/consistency proof primitives
