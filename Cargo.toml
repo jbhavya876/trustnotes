@@ -1,0 +1,34 @@
+[workspace]
+members = [
+    "crates/tn-types",
+    "crates/tn-crypto",
+    "crates/tn-oplog",
+    "crates/tn-merkle",
+    "crates/tn-tlog",
+    "crates/tn-proto",
+    "crates/tn-core",
+    "crates/tn-server",
+    "crates/tn-witness",
+    "crates/tn-monitor",
+    "crates/tn-cli",
+    "crates/tn-adversary",
+    "crates/tn-release",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+authors = ["Bhavya <bhavya@alterblock.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/alterblock/trustnotes"
+rust-version = "1.70"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+debug = true

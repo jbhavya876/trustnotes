@@ -1,0 +1,13 @@
+{
+  "confirmed": [],
+  "needs_validation": [
+    {
+      "finding_id": "VAL-001",
+      "title": "Windows Linker Toolchain Limitation",
+      "description": "On Windows developer environments without MSVC link.exe or Windows SDK, binary test linking fails unless an external linker (such as rust-lld with appropriate SDK paths or a Linux container) is provided. Cargo check and clippy compile cleanly.",
+      "reproduction_plan": "Execute cargo nextest inside the containerized Linux CI environment as configured in .github/workflows/ci.yml",
+      "affected_component": "toolchain/local-build"
+    }
+  ],
+  "rejected": []
+}

@@ -1,0 +1,36 @@
+name: Weekly
+on:
+  schedule:
+    - cron: '0 3 * * 1'  # 3 AM UTC every Monday
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    name: Dependency review (14-day rule)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - name: Audit for vulnerabilities
+        run: cargo audit
+      - name: Check for new crates (14-day rule)
+        run: |
+          # The 14-day rule: do not adopt a release published fewer than 14 days ago
+          # unless it fixes a known vulnerability.
+          # This check is manual review aided by the audit output above.
+          echo "Review cargo audit output above for any recently published crates."
+          echo "Do not merge dependency updates for releases published < 14 days ago."
+
+  reproducibility:
+    name: Reproducibility check (M4+)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reproducibility check (M4+)
+        run: |
+          echo "Reproducibility checks will be added in M4"
+          # Two independent container builds must produce identical SHA-256

@@ -1,0 +1,16 @@
+; TrustNotes Device Certificate CDDL Definition
+; Authorizes a device to submit ops for an account
+; Signed by AIK (classical Ed25519 + post-quantum ML-DSA-65)
+
+DeviceCertificate = {
+  v: 1,
+  account_id: bstr .size 32,
+  device_id: bstr .size 32,          ; SHA-256(dsk_ed_pub || dsk_pq_pub)
+  dsk_ed_pub: bstr .size 32,         ; Device Signing Key (Ed25519)
+  dsk_pq_pub: bstr,                  ; Device Signing Key (ML-DSA-65 pubkey)
+  dtk_pub: bstr,                     ; Device Transport Key (X-Wing pubkey)
+  issued_at: uint,                   ; Unix ms
+  expires_at: uint / null,           ; Unix ms (null = perpetual)
+  sig_aik_ed: bstr .size 64,         ; AIK-Ed signature over canonical cert body
+  sig_aik_pq: bstr                   ; AIK-PQ signature over canonical cert body
+}

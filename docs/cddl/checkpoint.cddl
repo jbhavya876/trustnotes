@@ -1,0 +1,19 @@
+; TrustNotes Checkpoint & Cosignature CDDL Definition
+; Compatible with C2SP tlog-checkpoint and tlog-cosignature
+
+CheckpointResponse = {
+  v: 1,
+  origin: tstr,                      ; log origin URI
+  size: uint,                        ; tree size (number of leaves)
+  root_hash: bstr .size 32,          ; SHA-256 Merkle root
+  timestamp: uint,                   ; Unix ms
+  sig_ed: bstr .size 64,             ; server Ed25519 signature
+  sig_pq: bstr,                      ; server ML-DSA-65 signature
+  cosignatures: [* Cosignature]      ; witness cosignatures (>= k required by policy)
+}
+
+Cosignature = {
+  witness_id: bstr .size 32,         ; SHA-256 of witness Ed25519 public key
+  timestamp: uint,                   ; Unix ms when cosigned
+  sig_ed: bstr .size 64              ; witness Ed25519 signature over signed note body
+}

@@ -1,0 +1,46 @@
+name: Nightly
+on:
+  schedule:
+    - cron: '0 2 * * *'  # 2 AM UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: Fuzz targets (30 min each)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust nightly (required for cargo-fuzz)
+        run: rustup toolchain install nightly
+      - name: Install cargo-fuzz
+        run: cargo +nightly install cargo-fuzz --locked
+      - name: Run fuzz targets (M1+)
+        run: |
+          echo "Fuzz targets will be added in M1"
+          # cargo +nightly fuzz run cbor_decode -- -max_total_time=1800
+
+  mutants:
+    name: Mutation testing (crypto crates)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cargo-mutants
+        run: cargo install cargo-mutants --locked
+      - name: Run cargo-mutants on crypto crates (M1+)
+        run: |
+          echo "Mutation tests will be added in M1"
+          # cargo mutants -p tn-crypto -p tn-oplog
+
+  e2e:
+    name: End-to-end (compose)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run e2e tests (M2+)
+        run: |
+          echo "E2E tests with Docker Compose will be added in M2"
+          # docker compose -f deploy/compose.yml up -d
+          # cargo nextest run --test e2e

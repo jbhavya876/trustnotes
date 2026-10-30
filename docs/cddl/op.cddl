@@ -1,0 +1,63 @@
+; TrustNotes Op CDDL Definition
+; Protocol Version: 1
+
+Op = {
+  v: 1,                              ; protocol version, always 1
+  account_id: bstr .size 32,         ; SHA-256('tn/v1/account-id' || AIK-Ed pub || AIK-PQ pub)
+  device_id: bstr .size 32,          ; SHA-256(DSK-Ed pub || DSK-PQ pub)
+  lane_seq: uint,                    ; per-device counter, starts at 0
+  lane_prev: bstr .size 32 / null,   ; op_id of previous op in this device lane (null if first)
+  hlc: [uint, uint],                 ; hybrid logical clock [wall_ms, counter] (advisory)
+  kind: op-kind,
+  object_id: bstr .size 16,          ; 128-bit random UUID (opaque to server)
+  nk_wrap: bstr / null,              ; Note Key wrapped under Vault Key (present on kind 1/put)
+  nonce: bstr .size 24,              ; 192-bit random nonce for content AEAD
+  deps: [* bstr .size 32],           ; op_ids this op causally follows
+  ct: bstr,                          ; XChaCha20-Poly1305 ciphertext of padded payload
+  sig_ed: bstr .size 64,             ; Ed25519 signature over canonical(OpHeader)
+  sig_pq: bstr                       ; ML-DSA-65 signature over canonical(OpHeader)
+}
+
+op-kind = (
+  put: 1 /
+  delete: 2 /
+  device-add: 3 /
+  device-revoke: 4 /
+  key-rotate: 5 /
+  shred: 6
+)
+
+OpHeader = {
+  v: 1,
+  account_id: bstr .size 32,
+  device_id: bstr .size 32,
+  lane_seq: uint,
+  lane_prev: bstr .size 32 / null,
+  hlc: [uint, uint],
+  kind: op-kind,
+  object_id: bstr .size 16,
+  nk_wrap: bstr / null,
+  nonce: bstr .size 24,
+  deps: [* bstr .size 32],
+  ct_hash: bstr .size 32             ; SHA-256(ct)
+}
+
+Payload = {
+  schema_v: uint,
+  title: tstr,
+  body_md: tstr,
+  tags: [* tstr],
+  notebook_id: bstr .size 16 / null,
+  flags: uint,                       ; bit 0: pinned, bit 1: trashed
+  created_at: uint,                  ; Unix ms
+  updated_at: uint                   ; Unix ms
+}
+
+OpAad = {
+  v: 1,
+  account_id: bstr .size 32,
+  device_id: bstr .size 32,
+  lane_seq: uint,
+  object_id: bstr .size 16,
+  kind: op-kind
+}

@@ -1,0 +1,23 @@
+{
+  "_comment": "TEST ONLY — TrustNotes Checkpoint Sample with 2-of-3 Cosignatures",
+  "_type": "CheckpointResponse",
+  "v": 1,
+  "origin": "trustnotes.alterblock.com/log/v1",
+  "size": 42,
+  "root_hash": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+  "timestamp": 1730344860000,
+  "sig_ed": "07070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707",
+  "sig_pq": "08080808080808080808080808080808",
+  "cosignatures": [
+    {
+      "witness_id": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c01",
+      "timestamp": 1730344861000,
+      "sig_ed": "0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d"
+    },
+    {
+      "witness_id": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c02",
+      "timestamp": 1730344861500,
+      "sig_ed": "0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e"
+    }
+  ]
+}

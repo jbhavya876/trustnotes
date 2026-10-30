@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TrustNotes: Private by content. Transparent by behavior.</title>
+  <meta name="description" content="An end-to-end encrypted notes app with a publicly verifiable server.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="site-nav">
+    <div class="container nav-inner">
+      <a href="#" class="brand-mark">trustnotes</a>
+      <nav aria-label="Main navigation">
+        <ul class="nav-links">
+          <li><a href="#claims" class="nav-link">claims</a></li>
+          <li><a href="#architecture" class="nav-link">architecture</a></li>
+          <li><a href="#non-claims" class="nav-link">limits</a></li>
+          <li><a href="https://github.com/alterblock/trustnotes" class="btn btn-secondary">source repository</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero Section -->
+    <section class="hero-section" aria-label="Introduction">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <h1 class="hero-headline">Private content. Verifiable transparency.</h1>
+          <p class="hero-sentence">End-to-end encrypted notes with a publicly audited untrusted server.</p>
+          <div class="hero-actions">
+            <a href="#claims" class="btn btn-primary">review 10 claims</a>
+            <a href="https://github.com/alterblock/trustnotes/blob/main/docs/SPEC.md" class="btn btn-secondary">read specification</a>
+          </div>
+        </div>
+
+        <div class="proof-stage" aria-label="Live transparency commitment demonstration">
+          <div class="stage-header">
+            <span class="stage-title">checkpoint 0x002a</span>
+            <span>epoch 42</span>
+          </div>
+          <div class="stage-entry">
+            <span class="stage-label">tree size</span>
+            <span class="stage-val">10,480 leaves</span>
+          </div>
+          <div class="stage-entry">
+            <span class="stage-label">root hash</span>
+            <span class="stage-val">b7f3a9e1c2d4f8b0e7a1c3d5f9b2d6…</span>
+          </div>
+          <div class="stage-entry">
+            <span class="stage-label">signature</span>
+            <span class="stage-val">ed25519 + ml-dsa-65 (verified)</span>
+          </div>
+          <div class="witness-block">
+            <span class="stage-label">witness cosignatures (2 of 3)</span>
+            <div class="witness-item">
+              <span>witness-01.alterblock.net</span>
+              <span>cosigned ok</span>
+            </div>
+            <div class="witness-item">
+              <span>witness-02.independent.org</span>
+              <span>cosigned ok</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Architecture Section -->
+    <section class="arch-section" id="architecture" aria-label="System architecture">
+      <div class="container">
+        <h2 class="section-head">How it works</h2>
+        <p class="section-sub">A zero-knowledge core anchored by append-only transparency structures.</p>
+        <div class="arch-grid">
+          <div class="arch-card">
+            <div class="arch-num">01</div>
+            <h3 class="arch-card-head">Client encryption</h3>
+            <p class="arch-card-body">All notes are sealed on your device with XChaCha20-Poly1305 and hybrid post-quantum signatures before transmission. The server never sees a key.</p>
+          </div>
+          <div class="arch-card">
+            <div class="arch-num">02</div>
+            <h3 class="arch-card-head">Committed ordering</h3>
+            <p class="arch-card-body">The untrusted server sequences mutations in an RFC 9162 append-only Merkle tree and issues signed receipts with cryptographic merge deadlines.</p>
+          </div>
+          <div class="arch-card">
+            <div class="arch-num">03</div>
+            <h3 class="arch-card-head">Witness verification</h3>
+            <p class="arch-card-body">Independent external witnesses cosign epoch checkpoints. Any attempt to modify, drop, reorder, or fork history is cryptographically caught.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Claims Section -->
+    <section class="claims-section" id="claims" aria-label="Testable claims">
+      <div class="container">
+        <h2 class="section-head">Ten testable claims</h2>
+        <p class="section-sub">Every claim is backed by automated adversarial test suites in the open repository.</p>
+        <table class="claims-table">
+          <thead>
+            <tr>
+              <th scope="col">claim</th>
+              <th scope="col">guarantee</th>
+              <th scope="col">verified by</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="claim-id">C1</td>
+              <td>
+                <div class="claim-title">Content confidentiality</div>
+                <div class="claim-desc">Operator cannot read note bodies, titles, tags, or folder names.</div>
+              </td>
+              <td class="claim-verification">Automated memory/disk canary tests</td>
+            </tr>
+            <tr>
+              <td class="claim-id">C2</td>
+              <td>
+                <div class="claim-title">Minimal metadata</div>
+                <div class="claim-desc">Server learns only documented fields listed in metadata specification.</div>
+              </td>
+              <td class="claim-verification">Schema audit CI test suite</td>
+            </tr>
+            <tr>
+              <td class="claim-id">C3</td>
+              <td>
+                <div class="claim-title">History integrity</div>
+                <div class="claim-desc">Server cannot modify, delete, reorder, or inject operations undetected.</div>
+              </td>
+              <td class="claim-verification">Adversarial simulator scenarios S1 to S6</td>
+            </tr>
+            <tr>
+              <td class="claim-id">C4</td>
+              <td>
+                <div class="claim-title">No split view</div>
+                <div class="claim-desc">Server cannot show diverging histories to different devices or observers.</div>
+              </td>
+              <td class="claim-verification">Witness cosigning and device gossip</td>
+            </tr>
+            <tr>
+              <td class="claim-id">C5</td>
+              <td>
+                <div class="claim-title">Accountable promises</div>
+                <div class="claim-desc">Every accepted operation receives a receipt; missing inclusion past deadline proves misbehavior.</div>
+              </td>
+              <td class="claim-verification">Cryptographic evidence bundle export</td>
+            </tr>
+            <tr>
+              <td class="claim-id">C6</td>
+              <td>
+                <div class="claim-title">Time evidence</div>
+                <div class="claim-desc">Checkpoints are anchored to Bitcoin through OpenTimestamps.</div>
+              </td>
+              <td class="claim-verification">Offline OTS block header validation</td>
+            </tr>
+            <tr>
+              <td class="claim-id">C7</td>
+              <td>
+                <div class="claim-title">Release integrity</div>
+                <div class="claim-desc">Every binary is reproducible, signed, and logged publicly.</div>
+              </td>
+              <td class="claim-verification">Two-builder reproducible build CI</td>
+            </tr>
+            <tr>
+              <td class="claim-id">C8</td>
+              <td>
+                <div class="claim-title">Post-quantum posture</div>
+                <div class="claim-desc">No long-term confidentiality or authenticity relies solely on classical math.</div>
+              </td>
+              <td class="claim-verification">ML-DSA-65 and ML-KEM-768 hybrid tests</td>
+            </tr>
+            <tr>
+              <td class="claim-id">C9</td>
+              <td>
+                <div class="claim-title">Operator-independent recovery</div>
+                <div class="claim-desc">Restore complete account from the 24-word Recovery Key alone.</div>
+              </td>
+              <td class="claim-verification">Full wipe and recovery drill tests</td>
+            </tr>
+            <tr>
+              <td class="claim-id">C10</td>
+              <td>
+                <div class="claim-title">Third-party auditability</div>
+                <div class="claim-desc">Outsiders can verify claims with open-source tools and zero server cooperation.</div>
+              </td>
+              <td class="claim-verification">Standalone tn-monitor auditor tool</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Non-Claims Section -->
+    <section class="non-claims-section" id="non-claims" aria-label="System limits">
+      <div class="container">
+        <h2 class="section-head">Honest limits</h2>
+        <p class="section-sub">We publish our explicit non-claims so trust is founded on boundaries, not marketing.</p>
+        <div class="non-claims-grid">
+          <div class="non-claim-item">
+            <h3 class="non-claim-title">Hostile endpoint</h3>
+            <p class="non-claim-desc">Malware or keyloggers on your personal machine defeat all encryption guarantees.</p>
+          </div>
+          <div class="non-claim-item">
+            <h3 class="non-claim-title">Denial of service</h3>
+            <p class="non-claim-desc">An untrusted server can refuse service or withhold data. This is detected, not prevented.</p>
+          </div>
+          <div class="non-claim-item">
+            <h3 class="non-claim-title">Network traffic analysis</h3>
+            <p class="non-claim-desc">Your IP address and synchronization cadence remain visible to network observers.</p>
+          </div>
+          <div class="non-claim-item">
+            <h3 class="non-claim-title">Recovery key loss</h3>
+            <p class="non-claim-desc">If you lose your 24-word Recovery Key, your notes cannot be restored by anyone.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span>trustnotes: open source under MIT and Apache-2.0</span>
+      <div class="footer-links">
+        <a href="https://github.com/alterblock/trustnotes" class="footer-link">github</a>
+        <a href="https://github.com/alterblock/trustnotes/blob/main/docs/SPEC.md" class="footer-link">spec</a>
+        <a href="https://github.com/alterblock/trustnotes/blob/main/docs/SECURITY.md" class="footer-link">security</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

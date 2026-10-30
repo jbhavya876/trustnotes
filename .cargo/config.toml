@@ -1,0 +1,5 @@
+[build]
+# Ensure --locked is used in CI (set via justfile)
+
+[net]
+retry = 3

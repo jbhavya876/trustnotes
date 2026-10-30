@@ -1,0 +1,7 @@
+/target
+*.lock.bak
+.env
+.env.local
+*.pem
+*.key
+# Never commit real secrets

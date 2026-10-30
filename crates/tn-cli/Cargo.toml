@@ -1,0 +1,20 @@
+[package]
+name = "tn-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "tn"
+path = "src/main.rs"
+
+[dependencies]
+tn-types = { path = "../tn-types" }
+tn-crypto = { path = "../tn-crypto" }
+tn-oplog = { path = "../tn-oplog" }
+tn-merkle = { path = "../tn-merkle" }
+tn-tlog = { path = "../tn-tlog" }
+tn-proto = { path = "../tn-proto" }
+tn-core = { path = "../tn-core" }
+
+[dev-dependencies]

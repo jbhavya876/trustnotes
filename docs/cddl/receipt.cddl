@@ -1,0 +1,14 @@
+; TrustNotes Receipt CDDL Definition
+; Signed promise from the sequencer for an accepted Op
+
+Receipt = {
+  v: 1,                              ; protocol version
+  account_id: bstr .size 32,
+  op_id: bstr .size 32,              ; SHA-256 of OpHeader
+  index: uint,                       ; 0-based position in account tree
+  account_tree_size_after: uint,     ; account tree size including this op
+  server_time: uint,                 ; Unix ms
+  mmd_epoch: uint,                   ; merge deadline: must appear in global log by this epoch
+  sig_ed: bstr .size 64,             ; server Ed25519 signature
+  sig_pq: bstr                       ; server ML-DSA-65 signature
+}

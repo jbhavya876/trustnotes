@@ -1,0 +1,26 @@
+{
+  "run_id": "audit-20261031-01",
+  "repo": "trustnotes",
+  "target": "c:\\trustnotes",
+  "source_ref": "m0-scaffold",
+  "profile": "standard",
+  "scope_paths": [
+    "crates/",
+    "docs/",
+    "Cargo.toml",
+    "deny.toml"
+  ],
+  "budget": 20,
+  "execution_policy": "sandboxed-source-and-local-only",
+  "selected_companion_files": [
+    "docs/THREAT_MODEL.md",
+    "docs/CRYPTO.md",
+    "docs/METADATA.md",
+    "docs/SPEC.md"
+  ],
+  "prior_run_paths": [],
+  "shared_file_owners": {
+    "parent": "antigravity"
+  },
+  "run_status": "complete"
+}

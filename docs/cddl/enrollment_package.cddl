@@ -1,0 +1,33 @@
+; TrustNotes Enrollment Package CDDL Definition
+; Delivers Account Root (AR) and Vault Key (VK) to an enrolling device
+; Encrypted to new device's DTK via HPKE (X-Wing)
+
+EnrollmentBlob = {
+  v: 1,
+  device_id_new: bstr .size 32,      ; new device identifier
+  device_id_sender: bstr .size 32,   ; enrolling existing device identifier
+  created_at: uint,                  ; Unix ms
+  hpke_ciphertext: bstr,             ; HPKE ciphertext of EnrollmentPayload
+  sig_ed: bstr .size 64,             ; sender DSK-Ed signature
+  sig_pq: bstr                       ; sender DSK-PQ signature
+}
+
+EnrollmentPayload = {
+  v: 1,
+  account_id: bstr .size 32,
+  account_root: bstr .size 32,       ; AR (zeroized upon receipt and import)
+  device_cert: DeviceCertificate
+}
+
+DeviceCertificate = {
+  v: 1,
+  account_id: bstr .size 32,
+  device_id: bstr .size 32,
+  dsk_ed_pub: bstr .size 32,
+  dsk_pq_pub: bstr,
+  dtk_pub: bstr,
+  issued_at: uint,
+  expires_at: uint / null,
+  sig_aik_ed: bstr .size 64,
+  sig_aik_pq: bstr
+}

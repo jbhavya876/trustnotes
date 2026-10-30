@@ -1,0 +1,23 @@
+[package]
+name = "trustnotes-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+tn-types = { path = "../crates/tn-types" }
+
+# Fuzz targets for M1 (added when implemented):
+# tn-crypto = { path = "../crates/tn-crypto" }
+# tn-oplog = { path = "../crates/tn-oplog" }
+# tn-merkle = { path = "../crates/tn-merkle" }
+
+[[bin]]
+name = "fuzz_placeholder"
+path = "fuzz_targets/placeholder.rs"
+test = false
+doc = false

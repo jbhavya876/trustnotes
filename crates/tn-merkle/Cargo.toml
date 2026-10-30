@@ -1,0 +1,10 @@
+[package]
+name = "tn-merkle"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tn-types = { path = "../tn-types" }
+
+[dev-dependencies]

@@ -1,0 +1,13 @@
+[package]
+name = "tn-witness"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tn-types = { path = "../tn-types" }
+tn-crypto = { path = "../tn-crypto" }
+tn-merkle = { path = "../tn-merkle" }
+tn-tlog = { path = "../tn-tlog" }
+
+[dev-dependencies]

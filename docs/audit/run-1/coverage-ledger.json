@@ -1,0 +1,44 @@
+{
+  "units": [
+    {
+      "unit_id": "crypto-primitive-wrappers",
+      "surface": "crates/tn-crypto",
+      "boundary": "local-in-memory",
+      "attack_class": "cryptographic-weakness",
+      "status": "covered",
+      "notes": "Reviewed pure Rust dependencies, forbid(unsafe_code), constant-time comparisons, and KAT plan"
+    },
+    {
+      "unit_id": "type-system-and-codec",
+      "surface": "crates/tn-types",
+      "boundary": "wire-deserialization",
+      "attack_class": "parser-injection-cbor",
+      "status": "covered",
+      "notes": "Reviewed CBOR strict decoding invariants: duplicate keys, indefinite lengths, non-shortest ints"
+    },
+    {
+      "unit_id": "auth-request-headers",
+      "surface": "crates/tn-proto",
+      "boundary": "network-rpc",
+      "attack_class": "authentication-bypass-replay",
+      "status": "covered",
+      "notes": "Reviewed nonce caching, 60s timestamp bounds, and hybrid signature structure"
+    },
+    {
+      "unit_id": "merkle-verification-pipeline",
+      "surface": "crates/tn-merkle",
+      "boundary": "client-verification",
+      "attack_class": "verification-bypass-equivocation",
+      "status": "covered",
+      "notes": "Reviewed RFC 9162 domain prefixes 0x00/0x01 and anti-fallback invariants (S13, S14)"
+    },
+    {
+      "unit_id": "supply-chain-and-licenses",
+      "surface": "deny.toml",
+      "boundary": "build-graph",
+      "attack_class": "malicious-dependency",
+      "status": "covered",
+      "notes": "cargo deny policy rejects GPL/AGPL copyleft, OpenSSL, SQLCipher, and unmaintained crates"
+    }
+  ]
+}
