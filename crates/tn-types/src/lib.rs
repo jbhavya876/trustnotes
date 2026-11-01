@@ -27,6 +27,36 @@ use std::fmt;
 /// Strict deterministic CBOR encoding and decoding wrapper.
 pub mod cbor;
 
+/// Helper module for serializing and deserializing 64-byte arrays with Serde.
+pub mod serde_bytes_64 {
+    use serde::{de::Error, Deserialize, Deserializer, Serializer};
+
+    /// Serializes a `[u8; 64]` as raw bytes.
+    ///
+    /// # Errors
+    /// Returns serialization error if serializer fails.
+    pub fn serialize<S>(bytes: &[u8; 64], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_bytes(bytes)
+    }
+
+    /// Deserializes a `[u8; 64]` from raw bytes.
+    ///
+    /// # Errors
+    /// Returns deserialization error if bytes length != 64.
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 64], D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let bytes = <Vec<u8>>::deserialize(deserializer)?;
+        bytes
+            .try_into()
+            .map_err(|v: Vec<u8>| D::Error::custom(format!("expected 64 bytes, got {}", v.len())))
+    }
+}
+
 /// Current trustnotes protocol version.
 pub const PROTOCOL_VERSION: u8 = 1;
 

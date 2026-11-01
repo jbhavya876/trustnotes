@@ -8,5 +8,8 @@ license.workspace = true
 tn-types = { path = "../tn-types" }
 tn-crypto = { path = "../tn-crypto" }
 tn-merkle = { path = "../tn-merkle" }
+sha2 = "0.10"
+serde = { version = "1", features = ["derive"] }
+base64 = "0.22"
 
 [dev-dependencies]

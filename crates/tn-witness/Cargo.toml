@@ -9,5 +9,8 @@ tn-types = { path = "../tn-types" }
 tn-crypto = { path = "../tn-crypto" }
 tn-merkle = { path = "../tn-merkle" }
 tn-tlog = { path = "../tn-tlog" }
+sha2 = "0.10"
+ed25519-dalek = { version = "2.1", default-features = false, features = ["fast", "zeroize"] }
+serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]

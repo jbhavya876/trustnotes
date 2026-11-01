@@ -31,7 +31,7 @@ pub fn decode_recovery_key(phrase: &str) -> Result<RecoveryKey, TnError> {
     for &word in &words {
         let idx = BIP39_WORDLIST
             .binary_search(&word)
-            .map_err(|_| TnError::Decode(format!("unknown recovery word: '{word}'")))?;
+            .map_err(|_| TnError::Decode("unknown word in recovery phrase".to_string()))?;
         indices.push(u16::try_from(idx).map_err(|e| TnError::Internal(e.to_string()))?);
     }
 

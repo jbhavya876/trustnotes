@@ -79,10 +79,10 @@ pub fn derive_account_id(ed_pk: &[u8; 32], pq_pk: &[u8]) -> Id32 {
 
 /// Derives a Local Storage Key (LSK) from a passphrase and 16-byte salt using Argon2id.
 ///
-/// Argon2id parameters:
-/// - Memory: 64 MiB (65,536 KiB)
+/// Argon2id parameters (per `docs/CRYPTO.md §1`):
+/// - Memory: 256 MiB in release (64 MiB floor in debug/testing)
 /// - Iterations: 3
-/// - Parallelism: 4
+/// - Parallelism: 1 (desktop default)
 /// - Output: 32 bytes
 ///
 /// # Errors
@@ -93,7 +93,12 @@ pub fn derive_lsk_from_passphrase(
 ) -> Result<LocalStorageKey, TnError> {
     use argon2::{Algorithm, Argon2, Params, Version};
 
-    let params = Params::new(65536, 3, 4, Some(32))
+    let m_kib = if cfg!(debug_assertions) {
+        65536
+    } else {
+        262144
+    };
+    let params = Params::new(m_kib, 3, 1, Some(32))
         .map_err(|e| TnError::Internal(format!("Invalid Argon2 params: {e}")))?;
     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
 

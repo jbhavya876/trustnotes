@@ -5,7 +5,7 @@
 //! Enforces:
 //! - Strictly monotonic `lane_seq` starting at 0.
 //! - Hash chaining: `lane_prev` points to previous `op_id`.
-//! - Any gap or fork immediately emits `TnError::LaneDiscontinuity`.
+//! - Any gap or fork immediately emits `TnError::OrderViolation`.
 
 use std::collections::HashMap;
 use tn_types::{Id32, TnError};
@@ -55,9 +55,16 @@ impl DeviceLaneTracker {
     }
 
     /// Updates the tracker state with the newly verified op.
-    pub fn advance(&mut self, op_id: Id32) {
+    ///
+    /// # Errors
+    /// Returns `TnError::OrderViolation` if sequence count overflows `u64::MAX`.
+    pub fn advance(&mut self, op_id: Id32) -> Result<(), TnError> {
         self.tip_op_id = Some(op_id);
-        self.next_seq = self.next_seq.saturating_add(1);
+        self.next_seq = self
+            .next_seq
+            .checked_add(1)
+            .ok_or(TnError::OrderViolation)?;
+        Ok(())
     }
 }
 
@@ -79,7 +86,7 @@ impl LaneRegistry {
     /// Verifies continuity and advances the lane on success.
     ///
     /// # Errors
-    /// Returns `TnError::LaneDiscontinuity` if continuity check fails.
+    /// Returns `TnError::OrderViolation` if continuity check or advance fails.
     pub fn record_op(&mut self, op: &Op, op_id: Id32) -> Result<(), TnError> {
         let tracker = self
             .lanes
@@ -87,7 +94,7 @@ impl LaneRegistry {
             .or_insert_with(|| DeviceLaneTracker::new(op.device_id));
 
         tracker.verify_continuity(op)?;
-        tracker.advance(op_id);
+        tracker.advance(op_id)?;
         Ok(())
     }
 

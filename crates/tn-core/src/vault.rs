@@ -15,7 +15,7 @@ use tn_oplog::{
     compute_ct_hash, compute_op_aad, compute_op_id, ConflictStatus, Hlc, LaneRegistry,
     NoteDagTracker, Op, OpHeader, Payload,
 };
-use tn_types::{Id16, Id32, OpKind, TnError};
+use tn_types::{cbor, Id16, Id32, OpKind, TnError};
 
 use crate::search::SearchIndex;
 use crate::storage::Storage;
@@ -103,15 +103,8 @@ impl Vault {
         getrandom::getrandom(&mut salt)
             .map_err(|e| TnError::Internal(format!("Salt generation failed: {e}")))?;
 
-        let lsk = match passphrase {
-            Some(p) => derive_lsk_from_passphrase(p, &salt)?,
-            None => {
-                let mut raw = [0u8; 32];
-                getrandom::getrandom(&mut raw)
-                    .map_err(|e| TnError::Internal(format!("Keygen failed: {e}")))?;
-                LocalStorageKey::from_bytes(raw)
-            }
-        };
+        let p = passphrase.unwrap_or("");
+        let lsk = derive_lsk_from_passphrase(p, &salt)?;
 
         // Save metadata
         storage.set_metadata("account_id", account_id.as_bytes())?;
@@ -167,18 +160,8 @@ impl Vault {
         let mut salt = [0u8; 16];
         salt.copy_from_slice(&salt_bytes);
 
-        let lsk = match passphrase {
-            Some(p) => derive_lsk_from_passphrase(p, &salt)?,
-            None => {
-                // If unencrypted keyring, load master key slot or fall back to empty
-                let raw = storage.get_metadata("unlocked_lsk")?.ok_or_else(|| {
-                    TnError::Internal("Vault requires passphrase to unlock".into())
-                })?;
-                let mut arr = [0u8; 32];
-                arr.copy_from_slice(&raw);
-                LocalStorageKey::from_bytes(arr)
-            }
-        };
+        let p = passphrase.unwrap_or("");
+        let lsk = derive_lsk_from_passphrase(p, &salt)?;
 
         let ar_bytes = storage
             .get_keyring_slot("account_root", &lsk)?
@@ -229,7 +212,7 @@ impl Vault {
     fn rebuild_state(&mut self) -> Result<(), TnError> {
         let ops = self.storage.get_all_ops()?;
         for (op_id, op) in ops {
-            let _ = self.lanes.record_op(&op, op_id);
+            self.lanes.record_op(&op, op_id)?;
             self.last_hlc = Some(match self.last_hlc {
                 Some(prev) => Hlc::update(&prev, &op.hlc),
                 None => op.hlc,
@@ -830,15 +813,8 @@ impl Vault {
         getrandom::getrandom(&mut salt)
             .map_err(|e| TnError::Internal(format!("Salt generation failed: {e}")))?;
 
-        let lsk = match passphrase {
-            Some(p) => derive_lsk_from_passphrase(p, &salt)?,
-            None => {
-                let mut raw = [0u8; 32];
-                getrandom::getrandom(&mut raw)
-                    .map_err(|e| TnError::Internal(format!("Keygen failed: {e}")))?;
-                LocalStorageKey::from_bytes(raw)
-            }
-        };
+        let p = passphrase.unwrap_or("");
+        let lsk = derive_lsk_from_passphrase(p, &salt)?;
 
         storage.set_metadata("account_id", account_id.as_bytes())?;
         storage.set_metadata("device_id", device_id.as_bytes())?;
@@ -876,6 +852,90 @@ impl Vault {
     #[must_use]
     pub fn account_root(&self) -> &AccountRoot {
         &self.account_root
+    }
+
+    /// Returns the account identifier.
+    #[must_use]
+    pub fn account_id(&self) -> Id32 {
+        self.account_id
+    }
+
+    /// Returns the device identifier.
+    #[must_use]
+    pub fn device_id(&self) -> Id32 {
+        self.device_id
+    }
+
+    /// Access to signing keys.
+    #[must_use]
+    pub fn signing_keys_ref(&self) -> &SigningKeys {
+        &self.signing_keys
+    }
+
+    /// Returns all stored ops.
+    ///
+    /// # Errors
+    /// Returns `TnError` on failure.
+    pub fn get_all_ops_internal(&self) -> Result<Vec<(Id32, Op)>, TnError> {
+        self.storage.get_all_ops()
+    }
+
+    /// Ingests an op that has been verified through the sync pipeline.
+    ///
+    /// # Errors
+    /// Returns `TnError` on failure.
+    pub fn ingest_verified_op(&mut self, op: &Op, op_id: Id32) -> Result<(), TnError> {
+        self.storage.insert_op(op, op_id)?;
+        self.lanes.record_op(op, op_id)?;
+        self.last_hlc = Some(match self.last_hlc {
+            Some(prev) => Hlc::update(&prev, &op.hlc),
+            None => op.hlc,
+        });
+
+        match op.kind {
+            OpKind::Put => {
+                if let Some(wrapped) = &op.nk_wrap {
+                    let nk = unwrap_note_key(&self.vault_key, op.object_id, wrapped)?;
+                    let aad = compute_op_aad(
+                        op.v,
+                        op.account_id,
+                        op.device_id,
+                        op.lane_seq,
+                        op.object_id,
+                        op.kind,
+                    )?;
+                    let mut full_ct = Vec::with_capacity(24 + op.ct.len());
+                    full_ct.extend_from_slice(&op.nonce);
+                    full_ct.extend_from_slice(&op.ct);
+
+                    let pt = open_note_payload(&nk, &aad, &full_ct)?;
+                    let payload: Payload = cbor::decode_canonical(&pt).or_else(|_| {
+                        serde_json::from_slice(&pt)
+                            .map_err(|e| TnError::Internal(format!("Decode payload error: {e}")))
+                    })?;
+
+                    self.storage.save_materialized_note(
+                        op.object_id,
+                        op_id,
+                        "active",
+                        &payload,
+                        &self.lsk,
+                    )?;
+                    self.search_index.index_note(
+                        op.object_id,
+                        &payload.title,
+                        &payload.body_md,
+                        &payload.tags,
+                    );
+                }
+            }
+            OpKind::Delete => {
+                self.search_index.remove_note(op.object_id);
+            }
+            _ => {}
+        }
+
+        Ok(())
     }
 }
 

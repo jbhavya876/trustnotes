@@ -10,12 +10,15 @@
 use ed25519_dalek::{Signer as EdSigner, Verifier as EdVerifier};
 use ml_dsa::signature::{Signer as PqSigner, Verifier as PqVerifier};
 use ml_dsa::{EncodedVerifyingKey, KeyExport, MlDsa65, VerifyingKey as PqVerifyingKey};
+use serde::{Deserialize, Serialize};
 use tn_types::TnError;
+use zeroize::Zeroize;
 
 /// Hybrid digital signature containing both classical (Ed25519) and PQ (ML-DSA-65) signatures.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HybridSignature {
     /// 64-byte Ed25519 signature.
+    #[serde(with = "tn_types::serde_bytes_64")]
     pub ed25519: [u8; 64],
     /// Serialized ML-DSA-65 signature (3309 bytes).
     pub ml_dsa: Vec<u8>,
@@ -40,7 +43,10 @@ impl SigningKeys {
         getrandom::getrandom(&mut pq_seed)
             .map_err(|e| TnError::Internal(format!("Entropy failure: {e}")))?;
 
-        Ok(Self::from_seeds(&ed_seed, &pq_seed))
+        let keys = Self::from_seeds(&ed_seed, &pq_seed);
+        ed_seed.zeroize();
+        pq_seed.zeroize();
+        Ok(keys)
     }
 
     /// Derives signing keys deterministically from 32-byte seeds.
@@ -87,7 +93,7 @@ impl Drop for SigningKeys {
 }
 
 /// Device or Account public verifying keys.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerifyingKeys {
     /// 32-byte Ed25519 public key.
     pub ed25519_bytes: [u8; 32],

@@ -123,6 +123,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
+name = "base64"
+version = "0.22.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
+
+[[package]]
 name = "base64ct"
 version = "1.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1240,10 +1246,13 @@ dependencies = [
 name = "tn-adversary"
 version = "0.1.0"
 dependencies = [
+ "tempfile",
+ "tn-core",
  "tn-crypto",
  "tn-merkle",
  "tn-oplog",
  "tn-proto",
+ "tn-server",
  "tn-tlog",
  "tn-types",
 ]
@@ -1286,6 +1295,7 @@ dependencies = [
  "tn-merkle",
  "tn-oplog",
  "tn-proto",
+ "tn-server",
  "tn-tlog",
  "tn-types",
  "zeroize",
@@ -1305,6 +1315,7 @@ dependencies = [
  "ml-dsa",
  "proptest",
  "rand_core 0.6.4",
+ "serde",
  "sha2",
  "subtle",
  "thiserror",
@@ -1316,6 +1327,9 @@ dependencies = [
 name = "tn-merkle"
 version = "0.1.0"
 dependencies = [
+ "proptest",
+ "serde",
+ "sha2",
  "tn-types",
 ]
 
@@ -1346,7 +1360,13 @@ dependencies = [
 name = "tn-proto"
 version = "0.1.0"
 dependencies = [
+ "base64",
+ "hex",
+ "serde",
+ "sha2",
  "tn-crypto",
+ "tn-merkle",
+ "tn-oplog",
  "tn-types",
 ]
 
@@ -1364,6 +1384,10 @@ dependencies = [
 name = "tn-server"
 version = "0.1.0"
 dependencies = [
+ "rusqlite",
+ "serde",
+ "sha2",
+ "tempfile",
  "tn-crypto",
  "tn-merkle",
  "tn-oplog",
@@ -1376,6 +1400,9 @@ dependencies = [
 name = "tn-tlog"
 version = "0.1.0"
 dependencies = [
+ "base64",
+ "serde",
+ "sha2",
  "tn-crypto",
  "tn-merkle",
  "tn-types",
@@ -1395,6 +1422,9 @@ dependencies = [
 name = "tn-witness"
 version = "0.1.0"
 dependencies = [
+ "ed25519-dalek",
+ "serde",
+ "sha2",
  "tn-crypto",
  "tn-merkle",
  "tn-tlog",
