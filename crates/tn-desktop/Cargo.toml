@@ -1,0 +1,20 @@
+[package]
+name = "tn-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tn-types = { path = "../tn-types" }
+tn-crypto = { path = "../tn-crypto" }
+tn-oplog = { path = "../tn-oplog" }
+tn-proto = { path = "../tn-proto" }
+tn-tlog = { path = "../tn-tlog" }
+tn-core = { path = "../tn-core" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+hex = "0.4"
+sha2 = "0.10"
+
+[dev-dependencies]
+tempfile = "3.16"

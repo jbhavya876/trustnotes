@@ -293,6 +293,7 @@ impl Vault {
             flags: 0,
             created_at: now_ms,
             updated_at: now_ms,
+            attachments: Vec::new(),
         };
 
         let lane_seq = self.lanes.next_seq(&self.device_id);
@@ -392,6 +393,7 @@ impl Vault {
             flags: 0,
             created_at: prev_created_at,
             updated_at: now_ms,
+            attachments: Vec::new(),
         };
 
         let lane_seq = self.lanes.next_seq(&self.device_id);

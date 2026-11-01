@@ -426,6 +426,7 @@ impl Storage {
                 flags,
                 created_at,
                 updated_at,
+                attachments: Vec::new(),
             };
 
             out.push((
@@ -471,6 +472,7 @@ mod tests {
             flags: 0,
             created_at: 100,
             updated_at: 200,
+            attachments: Vec::new(),
         };
 
         storage

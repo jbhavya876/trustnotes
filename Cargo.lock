@@ -1391,6 +1391,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "tn-desktop"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "tn-core",
+ "tn-crypto",
+ "tn-oplog",
+ "tn-proto",
+ "tn-tlog",
+ "tn-types",
+]
+
+[[package]]
 name = "tn-merkle"
 version = "0.1.0"
 dependencies = [

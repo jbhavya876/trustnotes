@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none';">
+  <title>TrustNotes — Verifiable Zero-Knowledge Notebook</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="app" class="app-layout">
+    <!-- Top Navigation Bar -->
+    <header class="app-header">
+      <div class="brand-zone">
+        <span class="brand-logo" aria-hidden="true">🔒</span>
+        <h1 class="brand-title">TrustNotes</h1>
+        <span class="brand-subtitle">v1.0 (End-to-End Verifiable)</span>
+      </div>
+
+      <div class="header-search">
+        <label for="search-input" class="visually-hidden">Search notes</label>
+        <input type="search" id="search-input" placeholder="Search notes (Ctrl+F)..." aria-label="Search notes" />
+      </div>
+
+      <div class="header-actions">
+        <button id="btn-verification-panel" class="btn btn-pill badge-verified" title="Open Cryptographic Verification Panel">
+          <span class="status-indicator">●</span>
+          <span id="badge-status-text">Log Verified</span>
+        </button>
+        <button id="btn-ai-assistant" class="btn btn-outline" title="Local AI Assistant Boundary">
+          <span aria-hidden="true">🤖</span> AI Boundary
+        </button>
+        <button id="btn-new-note" class="btn btn-primary" title="Create a new note (Ctrl+N)">
+          + New Note
+        </button>
+      </div>
+    </header>
+
+    <!-- Main 3-Column Workspace -->
+    <main class="app-body">
+      <!-- Left Sidebar: Notebooks & Notes List -->
+      <aside class="sidebar-pane" aria-label="Notebooks and notes navigation">
+        <div class="sidebar-section">
+          <div class="section-header">
+            <h2>Notebooks</h2>
+          </div>
+          <ul id="notebooks-list" class="nav-list">
+            <li class="nav-item active" data-notebook="all">
+              <span class="nav-icon">📁</span> All Notes (<span id="total-notes-count">0</span>)
+            </li>
+            <li class="nav-item" data-notebook="cryptography">
+              <span class="nav-icon">🔐</span> Cryptography
+            </li>
+            <li class="nav-item" data-notebook="research">
+              <span class="nav-icon">📝</span> Research
+            </li>
+            <li class="nav-item" data-notebook="personal">
+              <span class="nav-icon">🏷️</span> Personal
+            </li>
+          </ul>
+        </div>
+
+        <div class="sidebar-section note-list-section">
+          <div class="section-header">
+            <h2>Notes</h2>
+            <div class="filter-controls">
+              <button id="btn-filter-active" class="filter-chip active">Active</button>
+              <button id="btn-filter-conflicted" class="filter-chip">Conflicted</button>
+              <button id="btn-filter-trashed" class="filter-chip">Trash</button>
+            </div>
+          </div>
+          <div id="notes-list" class="notes-feed" role="listbox" aria-label="Notes list">
+            <!-- Populated dynamically by app.js -->
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center Pane: Note Editor & Markdown Live View -->
+      <section class="editor-pane" aria-label="Note editor">
+        <div class="editor-header">
+          <label for="note-title-input" class="visually-hidden">Note Title</label>
+          <input type="text" id="note-title-input" class="note-title-input" placeholder="Note Title..." />
+          <div class="editor-meta">
+            <span id="note-status-badge" class="badge">Verified-Final</span>
+            <span id="note-timestamp" class="meta-time">Updated just now</span>
+            <button id="btn-save-note" class="btn btn-secondary btn-sm" title="Save changes (Ctrl+S)">Save</button>
+            <button id="btn-delete-note" class="btn btn-danger btn-sm" title="Delete note">Delete</button>
+          </div>
+        </div>
+
+        <div class="editor-tags-bar">
+          <label for="note-tags-input" class="tag-label">Tags:</label>
+          <input type="text" id="note-tags-input" class="tags-input" placeholder="Add comma-separated tags..." />
+        </div>
+
+        <!-- Markdown Split Stage: Raw Markdown + Live Sanitized Render -->
+        <div class="editor-split-stage">
+          <div class="markdown-editor-box">
+            <label for="note-body-textarea" class="visually-hidden">Markdown content</label>
+            <textarea id="note-body-textarea" class="markdown-textarea" placeholder="Type Markdown here..."></textarea>
+          </div>
+          <div class="markdown-preview-box">
+            <div class="preview-header">Live Preview</div>
+            <div id="markdown-preview" class="preview-content"></div>
+          </div>
+        </div>
+
+        <!-- Encrypted 1 MiB Chunked Attachments Section -->
+        <div class="attachments-tray">
+          <div class="attachments-header">
+            <h3>Encrypted Attachments (1 MiB AEAD Chunks)</h3>
+            <label class="btn btn-outline btn-sm file-upload-label">
+              + Add Attachment
+              <input type="file" id="attachment-file-input" style="display:none;" />
+            </label>
+          </div>
+          <div id="attachments-list" class="attachments-grid">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Cryptographic Verification Panel Drawer -->
+    <div id="verification-drawer" class="drawer-modal" aria-hidden="true" role="dialog" aria-labelledby="verify-panel-title">
+      <div class="drawer-card">
+        <div class="drawer-header">
+          <h2 id="verify-panel-title">🛡️ Cryptographic Verification Panel (Claim C10)</h2>
+          <button id="btn-close-verification" class="btn-icon" aria-label="Close verification panel">&times;</button>
+        </div>
+        <div class="drawer-content">
+          <p class="drawer-lead">
+            Every operation in your notebook is committed to a transparency Merkle tree, witnessed by independent nodes, and anchored to Bitcoin.
+          </p>
+
+          <div class="verification-stats-grid">
+            <div class="stat-card">
+              <span class="stat-value text-success" id="stat-verified-final">0</span>
+              <span class="stat-label">Verified-Final Ops</span>
+              <span class="stat-subtext">Included in witnessed global tree (older than MMD)</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value text-warning" id="stat-provisional">0</span>
+              <span class="stat-label">Provisional Ops</span>
+              <span class="stat-subtext">Receipted & signed, awaiting epoch inclusion</span>
+            </div>
+          </div>
+
+          <div class="verify-detail-section">
+            <h3>Latest Witnessed Checkpoint</h3>
+            <div class="detail-row">
+              <span class="detail-label">Epoch:</span>
+              <span class="detail-value mono" id="verify-checkpoint-epoch">#0</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Tree Size:</span>
+              <span class="detail-value mono" id="verify-checkpoint-size">0 leaves</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Account Root:</span>
+              <span class="detail-value mono hash-truncate" id="verify-checkpoint-root">0000000000000000000000000000000000000000000000000000000000000000</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Witness Cosigners:</span>
+              <span class="detail-value" id="verify-witnesses-list">
+                <span class="badge badge-witness">Alpha (FIPS 204)</span>
+                <span class="badge badge-witness">Beta (Ed25519)</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="verify-detail-section">
+            <h3>Bitcoin OpenTimestamps Anchor</h3>
+            <div class="detail-row">
+              <span class="detail-label">Status:</span>
+              <span class="detail-value text-success" id="verify-ots-status">Anchored at Block 867,420</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Calendar:</span>
+              <span class="detail-value mono">alice.btc.calendar.opentimestamps.org</span>
+            </div>
+          </div>
+
+          <div class="verify-detail-section">
+            <h3>Release Binary Integrity</h3>
+            <div class="detail-row">
+              <span class="detail-label">Binary Self-Verify:</span>
+              <span class="detail-value text-success" id="verify-self-status">MATCH (Signed Release Log)</span>
+            </div>
+          </div>
+
+          <div class="drawer-actions">
+            <button id="btn-export-evidence" class="btn btn-primary btn-block">
+              📥 Export Evidence Bundle (.tnevidence)
+            </button>
+            <p class="help-text">Exports full cryptographic receipts and proofs for offline verification via <code>tn-monitor audit</code>.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Boundary & Local Inference Modal -->
+    <div id="ai-modal" class="drawer-modal" aria-hidden="true" role="dialog" aria-labelledby="ai-modal-title">
+      <div class="drawer-card">
+        <div class="drawer-header">
+          <h2 id="ai-modal-title">🤖 AI Security Boundary (Claims C1, C10)</h2>
+          <button id="btn-close-ai" class="btn-icon" aria-label="Close AI dialog">&times;</button>
+        </div>
+        <div class="drawer-content">
+          <div class="alert alert-warning">
+            <strong>Data Sovereignty Guard:</strong> By default, TrustNotes disables all AI inference to guarantee zero leakage. No note content is ever transmitted to any third-party cloud.
+          </div>
+
+          <div class="verify-detail-section">
+            <h3>Active AI Provider</h3>
+            <div class="detail-row">
+              <span class="detail-label">Provider:</span>
+              <span class="detail-value" id="ai-provider-name">Localhost Only (127.0.0.1)</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Endpoint:</span>
+              <span class="detail-value mono" id="ai-provider-endpoint">http://127.0.0.1:11434/api/generate</span>
+            </div>
+          </div>
+
+          <div class="verify-detail-section">
+            <h3>Prompt & Task</h3>
+            <textarea id="ai-prompt-input" class="markdown-textarea prompt-box" placeholder="What would you like the local model to do with this note? (e.g. Summarize key takeaways, extract action items)"></textarea>
+          </div>
+
+          <div class="consent-box">
+            <label class="consent-checkbox-label">
+              <input type="checkbox" id="ai-consent-checkbox" />
+              <span>I grant affirmative per-call consent to transmit this note's text strictly to my localhost model. An encrypted egress receipt will be permanently logged.</span>
+            </label>
+          </div>
+
+          <div class="drawer-actions">
+            <button id="btn-submit-ai" class="btn btn-primary btn-block" disabled>
+              Execute Local Inference
+            </button>
+          </div>
+
+          <div id="ai-result-box" class="ai-result-box" style="display:none;">
+            <h3>Model Completion</h3>
+            <div id="ai-response-text" class="ai-response-text"></div>
+          </div>
+
+          <div class="verify-detail-section">
+            <h3>Recent Encrypted Egress Receipts</h3>
+            <div id="ai-receipts-list" class="receipts-list">
+              <div class="receipt-item">
+                <span class="receipt-time">2 mins ago</span>
+                <span class="receipt-dest mono">127.0.0.1:11434</span>
+                <span class="receipt-hash mono">SHA-256: e3b0c442...</span>
+                <span class="badge badge-success">Local Verified</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sibling Conflict Resolution Modal -->
+    <div id="conflict-modal" class="drawer-modal" aria-hidden="true" role="dialog" aria-labelledby="conflict-modal-title">
+      <div class="drawer-card modal-wide">
+        <div class="drawer-header">
+          <h2 id="conflict-modal-title">⚔️ Sibling Conflict Resolution (ADR-0004)</h2>
+          <button id="btn-close-conflict" class="btn-icon" aria-label="Close conflict resolver">&times;</button>
+        </div>
+        <div class="drawer-content">
+          <p>Two devices authored concurrent updates to this note without synchronization. Select how you would like to resolve the sibling DAG:</p>
+          <div class="conflict-comparison-grid">
+            <div class="conflict-pane">
+              <h3>Branch A (Device 1)</h3>
+              <div class="conflict-meta">Author: Device A • Timestamp: 14:32:01</div>
+              <div id="conflict-content-a" class="conflict-body"></div>
+              <button id="btn-choose-a" class="btn btn-outline btn-block">Keep Branch A</button>
+            </div>
+            <div class="conflict-pane">
+              <h3>Branch B (Device 2)</h3>
+              <div class="conflict-meta">Author: Device B • Timestamp: 14:32:15</div>
+              <div id="conflict-content-b" class="conflict-body"></div>
+              <button id="btn-choose-b" class="btn btn-outline btn-block">Keep Branch B</button>
+            </div>
+          </div>
+          <div class="drawer-actions">
+            <button id="btn-merge-both" class="btn btn-primary btn-block">Merge Both Branches</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>

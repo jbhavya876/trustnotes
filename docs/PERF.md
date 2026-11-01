@@ -21,7 +21,7 @@ Performance targets are measured with `criterion` microbenchmarks and end-to-end
 | **P2** | Inclusion-proof verification ($N=10{,}000$ tree) | $< 5\text{ ms}$ | *Pending M3 implementation* | M3 | — | Pending |
 | **P3** | Full sync & verification ($10{,}000\text{ ops}$ from genesis) | $< 10\text{ s}$ | *Pending M3 implementation* | M3 | Localhost / laptop | Pending |
 | **P4** | Server sustained throughput (4 vCPUs, optimistic concurrency) | $> 500\text{ ops/sec}$ | *Pending M2 implementation* | M2 | Docker Compose | Pending |
-| **P5** | Client in-memory footprint ($20{,}000\text{ notes}$, search index built) | $< 300\text{ MB}$ | *Pending M6 implementation* | M6 | 64-bit desktop | Pending |
+| **P5** | Client in-memory footprint ($20{,}000\text{ notes}$, search index built) | $< 300\text{ MB}$ | **29.48 MB** (Indexed in 184.7 ms) | M6 | 64-bit desktop (Windows) | **Verified** |
 
 ---
 

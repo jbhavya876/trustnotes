@@ -11,6 +11,23 @@ use tn_types::{cbor, Id16, Id32, OpKind, TnError};
 
 use crate::hlc::Hlc;
 
+/// Manifest for chunked encrypted attachments (SPEC §M6).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AttachmentManifest {
+    /// Unique 16-byte identifier for the attachment.
+    pub id: Id16,
+    /// Human-readable filename.
+    pub filename: String,
+    /// MIME type (e.g. "application/pdf", "image/png").
+    pub mime_type: String,
+    /// Total plaintext size in bytes.
+    pub total_size: u64,
+    /// Size of each chunk in bytes (default 1 MiB = 1,048,576 bytes).
+    pub chunk_size: u32,
+    /// SHA-256 hashes of each decrypted chunk.
+    pub chunk_hashes: Vec<[u8; 32]>,
+}
+
 /// Unencrypted note payload stored inside the AEAD ciphertext `ct`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Payload {
@@ -30,6 +47,9 @@ pub struct Payload {
     pub created_at: u64,
     /// Modification timestamp (Unix ms).
     pub updated_at: u64,
+    /// Optional attachment manifests for encrypted chunks.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attachments: Vec<AttachmentManifest>,
 }
 
 impl Payload {
@@ -37,6 +57,31 @@ impl Payload {
     pub const FLAG_PINNED: u32 = 1 << 0;
     /// Flag bit 1: trashed note.
     pub const FLAG_TRASHED: u32 = 1 << 1;
+
+    /// Creates a new note payload without attachments.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        schema_v: u32,
+        title: String,
+        body_md: String,
+        tags: Vec<String>,
+        notebook_id: Option<Id16>,
+        flags: u32,
+        created_at: u64,
+        updated_at: u64,
+    ) -> Self {
+        Self {
+            schema_v,
+            title,
+            body_md,
+            tags,
+            notebook_id,
+            flags,
+            created_at,
+            updated_at,
+            attachments: Vec::new(),
+        }
+    }
 
     /// Checks if note is pinned.
     #[must_use]

@@ -116,6 +116,16 @@ pub enum TnError {
     UnsupportedVersion { found: u8, expected: u8 },
     /// The server signing key changed without a log entry. Scenario S17.
     UnloggedKeyChange,
+    /// AI is globally or locally disabled. Fails closed.
+    AiDisabled,
+    /// An AI call was attempted without affirmative per-call user consent.
+    AiConsentDenied,
+    /// An AI provider attempted to contact a non-localhost endpoint without authorization.
+    AiRemoteDisallowed(String),
+    /// An attachment chunk failed integrity verification or was tampered.
+    AttachmentTampered,
+    /// An unauthorized network egress was detected or blocked.
+    EgressViolation(String),
     /// An internal error not related to a security boundary.
     Internal(String),
 }
@@ -205,6 +215,26 @@ impl fmt::Display for TnError {
                     "unlogged key change: server signing key changed with no transparency log entry"
                 )
             }
+            Self::AiDisabled => write!(f, "ai disabled: fail closed"),
+            Self::AiConsentDenied => {
+                write!(
+                    f,
+                    "ai consent denied: missing affirmative user consent token"
+                )
+            }
+            Self::AiRemoteDisallowed(endpoint) => {
+                write!(
+                    f,
+                    "ai remote disallowed: endpoint {endpoint} is not localhost"
+                )
+            }
+            Self::AttachmentTampered => {
+                write!(
+                    f,
+                    "attachment tampered: chunk hash mismatch or AEAD tag failure"
+                )
+            }
+            Self::EgressViolation(msg) => write!(f, "egress violation: {msg}"),
             Self::Internal(msg) => write!(f, "internal: {msg}"),
         }
     }

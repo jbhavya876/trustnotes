@@ -11,6 +11,7 @@ members = [
     "crates/tn-witness",
     "crates/tn-monitor",
     "crates/tn-cli",
+    "crates/tn-desktop",
     "crates/tn-adversary",
     "crates/tn-release",
 ]

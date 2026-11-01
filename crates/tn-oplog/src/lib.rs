@@ -21,4 +21,6 @@ pub mod op;
 pub use conflict::{ConflictStatus, NoteDagTracker};
 pub use hlc::Hlc;
 pub use lane::{DeviceLaneTracker, LaneRegistry};
-pub use op::{compute_ct_hash, compute_op_aad, compute_op_id, Op, OpHeader, Payload};
+pub use op::{
+    compute_ct_hash, compute_op_aad, compute_op_id, AttachmentManifest, Op, OpHeader, Payload,
+};

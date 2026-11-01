@@ -35,7 +35,7 @@ pub use aead::{
 };
 pub use kdf::{
     derive_account_id, derive_account_root, derive_aik_ed_seed, derive_aik_pq_seed,
-    derive_device_id, derive_lsk_from_passphrase, derive_vault_key,
+    derive_device_id, derive_hkdf_sha256, derive_lsk_from_passphrase, derive_vault_key,
 };
 pub use kem::{
     decapsulate, encapsulate, HybridCiphertext, HybridKemKeyPair, HybridKemPrivateKey,

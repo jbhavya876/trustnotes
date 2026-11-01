@@ -15,12 +15,22 @@
 //! - Client sync engine & fail-closed verification pipeline (`sync`)
 //! - High-level note CRUD and fail-closed verification pipeline (`vault`)
 
+pub mod ai;
+pub mod attachment;
 pub mod ipc;
 pub mod search;
 pub mod storage;
 pub mod sync;
 pub mod vault;
 
+pub use ai::{
+    AiBoundaryGuard, AiConsentToken, AiEgressReceipt, AiProvider, DisabledAiProvider,
+    LocalhostAiProvider,
+};
+pub use attachment::{
+    derive_attachment_key, open_attachment, seal_attachment, seal_attachment_with_chunk_size,
+    EncryptedChunk, DEFAULT_CHUNK_SIZE,
+};
 pub use ipc::{
     generate_auth_token, read_token_file, write_token_file, DaemonClient, DaemonServer,
     DaemonStatus, IpcCommand, IpcPayload, IpcRequest, IpcResponse, IpcToken,

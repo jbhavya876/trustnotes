@@ -14,6 +14,19 @@ use crate::labels::{
     LABEL_VAULT_KEY,
 };
 
+/// Generic HKDF-SHA-256 derivation of a 32-byte key.
+///
+/// # Panics
+/// Panics only if HKDF expansion fails (cannot happen for 32-byte output).
+#[must_use]
+pub fn derive_hkdf_sha256(ikm: &[u8], salt: Option<&[u8]>, info: &[u8]) -> [u8; 32] {
+    let hk = Hkdf::<Sha256>::new(salt, ikm);
+    let mut okm = [0u8; 32];
+    hk.expand(info, &mut okm)
+        .expect("32 bytes is valid length for HKDF-SHA256");
+    okm
+}
+
 /// Derives the Account Root (AR) from the 256-bit Recovery Key (RK).
 ///
 /// # Panics
