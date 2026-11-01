@@ -52,6 +52,12 @@ pub const LABEL_GOSSIP_SIG: &str = "tn/v1/gossip/sig";
 /// Label for evidence bundles.
 pub const LABEL_EVIDENCE_BUNDLE: &str = "tn/v1/evidence/bundle";
 
+/// Label for release log leaves.
+pub const LABEL_RELEASE_LEAF: &str = "tn/v1/release-leaf";
+
+/// Signature label for reproducible build builder attestations.
+pub const LABEL_BUILDER_SIG: &str = "tn/v1/builder/sig";
+
 /// Comprehensive slice of all defined context labels.
 pub const ALL_LABELS: &[&str] = &[
     LABEL_ACCOUNT_ROOT,
@@ -69,6 +75,8 @@ pub const ALL_LABELS: &[&str] = &[
     LABEL_DEVICE_ENROLLMENT,
     LABEL_GOSSIP_SIG,
     LABEL_EVIDENCE_BUNDLE,
+    LABEL_RELEASE_LEAF,
+    LABEL_BUILDER_SIG,
 ];
 
 #[cfg(test)]
@@ -85,7 +93,7 @@ mod tests {
                 "duplicate context label detected: {label}"
             );
         }
-        assert_eq!(ALL_LABELS.len(), 15);
+        assert_eq!(ALL_LABELS.len(), 17);
     }
 
     #[test]

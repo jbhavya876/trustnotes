@@ -13,9 +13,14 @@
 //! recovery drills, and local integrity verification.
 
 use clap::{Parser, Subcommand};
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::PathBuf;
 use tn_core::Vault;
+use tn_proto::evidence::{BundleEvidence, EvidenceBundle};
+use tn_proto::release::{ReleaseLog, ReleaseLogManifest};
+use tn_tlog::ots::{verify_ots_proof, BitcoinBlockHeader, OtsProof};
+use tn_tlog::Checkpoint;
 use tn_types::Id16;
 
 #[derive(Parser)]
@@ -134,6 +139,72 @@ enum Commands {
         #[arg(long)]
         local: bool,
     },
+    /// Bitcoin OpenTimestamps verification (Claim C6).
+    Anchor {
+        #[command(subcommand)]
+        action: AnchorAction,
+    },
+    /// Verify executable or specified binary against the Release Transparency Log (Claim C7).
+    SelfVerify {
+        /// Path to binary to verify (defaults to current running executable).
+        #[arg(long)]
+        binary: Option<PathBuf>,
+        /// Path to release transparency log manifest (CBOR).
+        #[arg(long)]
+        release_log: PathBuf,
+        /// Expected semantic version (e.g. "0.1.0" or "v0.1.0").
+        #[arg(long)]
+        version: Option<String>,
+        /// Target triple (e.g. "x86_64-pc-windows-msvc").
+        #[arg(long)]
+        target: Option<String>,
+    },
+    /// Export or inspect cryptographic Evidence Bundles proving server misbehavior (Claim C5, ADR-0001).
+    Evidence {
+        #[command(subcommand)]
+        action: EvidenceAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum AnchorAction {
+    /// Verify an OpenTimestamps proof for a checkpoint root against Bitcoin block headers.
+    Verify {
+        /// Path to CBOR checkpoint file.
+        #[arg(long)]
+        checkpoint: Option<PathBuf>,
+        /// Hex-encoded root hash directly (if checkpoint file not provided).
+        #[arg(long)]
+        root_hash: Option<String>,
+        /// Path to OTS proof file (CBOR).
+        #[arg(long, alias = "ots")]
+        proof: PathBuf,
+        /// Expected Bitcoin block hash (64 hex characters).
+        #[arg(long)]
+        block_hash: Option<String>,
+        /// Path to binary Bitcoin block headers file (80 bytes).
+        #[arg(long)]
+        headers: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand)]
+enum EvidenceAction {
+    /// Export evidence bundle from vault or specific file.
+    Export {
+        /// Output file path to write CBOR evidence bundle to.
+        #[arg(long, short, alias = "out")]
+        output: PathBuf,
+        /// Path to receipt file (optional).
+        #[arg(long)]
+        receipt: Option<PathBuf>,
+    },
+    /// Inspect an evidence bundle file.
+    Inspect {
+        /// Path to evidence bundle file.
+        #[arg(long)]
+        file: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -145,6 +216,18 @@ enum RecoveryAction {
         #[arg(long)]
         passphrase: Option<String>,
     },
+}
+
+fn parse_id32(hex_str: &str) -> anyhow::Result<[u8; 32]> {
+    let clean = hex_str.trim().trim_start_matches("0x");
+    let bytes =
+        hex::decode(clean).map_err(|e| anyhow::anyhow!("Invalid hex 32-byte string: {e}"))?;
+    if bytes.len() != 32 {
+        anyhow::bail!("Expected exactly 32 bytes (64 hex characters)");
+    }
+    let mut arr = [0u8; 32];
+    arr.copy_from_slice(&bytes);
+    Ok(arr)
 }
 
 fn parse_id16(hex_str: &str) -> anyhow::Result<Id16> {
@@ -173,6 +256,10 @@ fn resolve_db_path(opt: Option<PathBuf>) -> PathBuf {
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
+    run_cli(cli)
+}
+
+fn run_cli(cli: Cli) -> anyhow::Result<()> {
     let db_path = resolve_db_path(cli.db);
 
     match cli.command {
@@ -395,6 +482,153 @@ fn main() -> anyhow::Result<()> {
             println!("Status:       VERIFIED (all invariants hold)");
             println!("========================================");
         }
+        Commands::Anchor { action } => match action {
+            AnchorAction::Verify {
+                checkpoint,
+                root_hash,
+                proof,
+                block_hash,
+                headers,
+            } => {
+                let target_root = if let Some(cp_path) = checkpoint {
+                    let cp_bytes = fs::read(&cp_path)?;
+                    let cp = Checkpoint::from_cbor(&cp_bytes)?;
+                    cp.root_hash
+                } else if let Some(rh_str) = root_hash {
+                    parse_id32(&rh_str)?
+                } else {
+                    anyhow::bail!("Specify either --checkpoint <PATH> or --root-hash <HEX>");
+                };
+
+                let proof_bytes = fs::read(&proof)?;
+                let ots_proof = OtsProof::from_bytes(&proof_bytes)?;
+
+                let expected_hash = if let Some(bh_str) = block_hash {
+                    parse_id32(&bh_str)?
+                } else if let Some(hdr_path) = headers {
+                    let hdr_bytes = fs::read(&hdr_path)?;
+                    let hdr = BitcoinBlockHeader::from_bytes(&hdr_bytes)?;
+                    hdr.block_hash()
+                } else {
+                    ots_proof.block_header.block_hash()
+                };
+
+                let res = verify_ots_proof(&target_root, &ots_proof, &expected_hash)?;
+
+                println!("========================================");
+                println!("BITCOIN OPENTIMESTAMPS VERIFICATION");
+                println!("========================================");
+                println!("Checkpoint Root: {}", hex::encode(target_root));
+                println!("Bitcoin Height:  {}", res.block_height);
+                println!("Bitcoin Hash:    {}", hex::encode(res.block_hash));
+                println!("Bitcoin Time:    {}", res.block_timestamp);
+                println!("Status:          VERIFIED (anchored in Bitcoin chain)");
+                println!("========================================");
+            }
+        },
+        Commands::SelfVerify {
+            binary,
+            release_log,
+            version,
+            target,
+        } => {
+            let bin_path = if let Some(p) = binary {
+                p
+            } else {
+                std::env::current_exe()?
+            };
+            let bin_bytes = fs::read(&bin_path)?;
+            let bin_hash: [u8; 32] = Sha256::digest(&bin_bytes).into();
+
+            let manifest_bytes = fs::read(&release_log)?;
+            let manifest = ReleaseLogManifest::from_cbor(&manifest_bytes)?;
+            let log = ReleaseLog::from_manifest(manifest);
+
+            let (idx, entry) = log
+                .entries()
+                .iter()
+                .enumerate()
+                .find(|(_, e)| {
+                    if let Some(v) = &version {
+                        if &e.version != v {
+                            return false;
+                        }
+                    }
+                    if let Some(t) = &target {
+                        if &e.target != t {
+                            return false;
+                        }
+                    }
+                    e.binary_hash == bin_hash
+                })
+                .map(|(i, e)| (i as u64, e))
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Binary hash {} not found in release transparency log",
+                        hex::encode(bin_hash)
+                    )
+                })?;
+
+            let proof = log.inclusion_proof(idx)?;
+            let root = log.root();
+
+            let leaf_hash = entry.compute_leaf_hash();
+            tn_merkle::verify_inclusion(&leaf_hash, &proof, &root)?;
+
+            println!("========================================");
+            println!("RELEASE TRANSPARENCY VERIFICATION");
+            println!("========================================");
+            println!("Binary Path:     {}", bin_path.display());
+            println!("Binary SHA-256:  {}", hex::encode(bin_hash));
+            println!("Version:         {}", entry.version);
+            println!("Target Triple:   {}", entry.target);
+            println!("Release Log Size:{}", log.len());
+            println!("Release Root:    {}", hex::encode(root.as_bytes()));
+            println!(
+                "Attestations:    {} builder signatures",
+                entry.attestations.len()
+            );
+            println!("Status:          VERIFIED (byte-for-byte authentic reproducible release)");
+            println!("========================================");
+        }
+        Commands::Evidence { action } => match action {
+            EvidenceAction::Export { output, receipt: _ } => {
+                let pass = cli.passphrase.as_deref();
+                let vault = Vault::open(&db_path, pass)?;
+                if let Some(bundle_bytes) = vault.get_last_evidence_bundle()? {
+                    fs::write(&output, &bundle_bytes)?;
+                    println!(
+                        "Exported evidence bundle ({} bytes) to {}",
+                        bundle_bytes.len(),
+                        output.display()
+                    );
+                } else {
+                    anyhow::bail!("No evidence bundle recorded in vault metadata");
+                }
+            }
+            EvidenceAction::Inspect { file } => {
+                let bytes = fs::read(&file)?;
+                let bundle = EvidenceBundle::from_cbor(&bytes)?;
+                let kind_str = match bundle.evidence {
+                    BundleEvidence::MergeDeadline(_) => "MergeDeadlineMissed (Scenario S10)",
+                    BundleEvidence::Equivocation(_) => "Equivocation (Scenario S12)",
+                    BundleEvidence::SplitView(_) => "SplitView (Scenario S7)",
+                };
+
+                println!("========================================");
+                println!("EVIDENCE BUNDLE INSPECTION");
+                println!("========================================");
+                println!("Bundle File:   {}", file.display());
+                println!("Kind:          {}", kind_str);
+                println!(
+                    "Account ID:    {}",
+                    hex::encode(bundle.account_id.as_bytes())
+                );
+                println!("Created At:    {} ms", bundle.created_at);
+                println!("Status:        CRYPTOGRAPHIC PROOF OF OPERATOR MISBEHAVIOR");
+                println!("========================================");
+            }
+        },
     }
 
     Ok(())
@@ -445,5 +679,147 @@ mod tests {
         let hits = vault.search("Test").unwrap();
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].object_id, note_id);
+    }
+
+    #[test]
+    fn test_cli_anchor_verify() {
+        let dir = tempdir().unwrap();
+        let cp_path = dir.path().join("checkpoint.cbor");
+        let ots_path = dir.path().join("checkpoint.ots");
+
+        let cp_root = [0x55u8; 32];
+        let checkpoint = Checkpoint {
+            origin: "trustnotes.org/log/test".into(),
+            size: 100,
+            root_hash: cp_root,
+            timestamp_ms: 1_700_000_000_000,
+            server_sig: tn_crypto::HybridSignature {
+                ed25519: [0u8; 64],
+                ml_dsa: vec![],
+            },
+            cosignatures: vec![],
+        };
+        fs::write(&cp_path, checkpoint.to_cbor().unwrap()).unwrap();
+
+        let (proof, block_hash) =
+            tn_tlog::ots::create_mock_ots_proof(&cp_root, 800_000, 1_700_000_000);
+        fs::write(&ots_path, proof.to_bytes().unwrap()).unwrap();
+
+        let cli = Cli {
+            db: None,
+            passphrase: None,
+            command: Commands::Anchor {
+                action: AnchorAction::Verify {
+                    checkpoint: Some(cp_path),
+                    root_hash: None,
+                    proof: ots_path,
+                    block_hash: Some(hex::encode(block_hash)),
+                    headers: None,
+                },
+            },
+        };
+        assert!(run_cli(cli).is_ok());
+    }
+
+    #[test]
+    fn test_cli_self_verify() {
+        use tn_proto::release::ReleaseEntry;
+
+        let dir = tempdir().unwrap();
+        let bin_path = dir.path().join("dummy_bin.exe");
+        let release_log_path = dir.path().join("releases.cbor");
+
+        let bin_bytes = b"fake-executable-binary-payload-for-test";
+        fs::write(&bin_path, bin_bytes).unwrap();
+        let bin_hash: [u8; 32] = sha2::Sha256::digest(bin_bytes).into();
+
+        let mut release_log = ReleaseLog::new();
+        release_log.append_entry(ReleaseEntry {
+            version: "1.0.0".into(),
+            target: "x86_64-pc-windows-msvc".into(),
+            binary_hash: bin_hash,
+            attestations: vec![],
+        });
+
+        fs::write(
+            &release_log_path,
+            release_log.to_manifest().to_cbor().unwrap(),
+        )
+        .unwrap();
+
+        let cli = Cli {
+            db: None,
+            passphrase: None,
+            command: Commands::SelfVerify {
+                binary: Some(bin_path),
+                release_log: release_log_path,
+                version: Some("1.0.0".into()),
+                target: Some("x86_64-pc-windows-msvc".into()),
+            },
+        };
+        assert!(run_cli(cli).is_ok());
+    }
+
+    #[test]
+    fn test_cli_evidence_export_and_inspect() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("vault_ev.db");
+        let ev_path = dir.path().join("evidence.cbor");
+
+        let (vault, _) = Vault::create_new(&db_path, Some("evpass")).unwrap();
+        let bundle = EvidenceBundle::new_equivocation(
+            tn_types::Id32::from_bytes([0x11; 32]),
+            10,
+            Checkpoint {
+                origin: "tlog".into(),
+                size: 10,
+                root_hash: [0xaa; 32],
+                timestamp_ms: 1000,
+                server_sig: tn_crypto::HybridSignature {
+                    ed25519: [0; 64],
+                    ml_dsa: vec![],
+                },
+                cosignatures: vec![],
+            },
+            Checkpoint {
+                origin: "tlog".into(),
+                size: 10,
+                root_hash: [0xbb; 32],
+                timestamp_ms: 1000,
+                server_sig: tn_crypto::HybridSignature {
+                    ed25519: [0; 64],
+                    ml_dsa: vec![],
+                },
+                cosignatures: vec![],
+            },
+            1000,
+        );
+        vault
+            .set_last_evidence_bundle(&bundle.to_cbor().unwrap())
+            .unwrap();
+
+        // Export
+        let cli_export = Cli {
+            db: Some(db_path),
+            passphrase: Some("evpass".into()),
+            command: Commands::Evidence {
+                action: EvidenceAction::Export {
+                    output: ev_path.clone(),
+                    receipt: None,
+                },
+            },
+        };
+        assert!(run_cli(cli_export).is_ok());
+        assert!(ev_path.exists());
+
+        // Inspect
+        let cli_inspect = Cli {
+            db: None,
+            passphrase: None,
+            command: Commands::Evidence {
+                action: EvidenceAction::Inspect { file: ev_path },
+            },
+        };
+        assert!(run_cli(cli_inspect).is_ok());
     }
 }

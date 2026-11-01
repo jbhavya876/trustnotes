@@ -1304,6 +1304,23 @@ impl Vault {
 
         Ok(())
     }
+
+    /// Retrieves the last recorded evidence bundle bytes (CBOR format), if any misbehavior was detected.
+    ///
+    /// # Errors
+    /// Returns `TnError` if reading metadata fails.
+    pub fn get_last_evidence_bundle(&self) -> Result<Option<Vec<u8>>, TnError> {
+        self.storage.get_metadata("last_evidence_bundle")
+    }
+
+    /// Persists an evidence bundle to local metadata.
+    ///
+    /// # Errors
+    /// Returns `TnError` if writing metadata fails.
+    pub fn set_last_evidence_bundle(&self, bundle_cbor: &[u8]) -> Result<(), TnError> {
+        self.storage
+            .set_metadata("last_evidence_bundle", bundle_cbor)
+    }
 }
 
 #[cfg(test)]

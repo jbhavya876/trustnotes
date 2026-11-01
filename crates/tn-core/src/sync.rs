@@ -13,8 +13,8 @@
 use tn_crypto::VerifyingKeys;
 use tn_merkle::{verify_consistency, ConsistencyProof, MerkleRoot};
 use tn_proto::{
-    sign_request, AccountHeadResp, AuthHeaders, ConsistencyProofResp, OpFetchResp, OpSubmitReq,
-    OpSubmitResp, Receipt,
+    sign_request, AccountHeadResp, AuthHeaders, ConsistencyProofResp, EvidenceBundle, OpFetchResp,
+    OpSubmitReq, OpSubmitResp, Receipt,
 };
 use tn_tlog::{verify_checkpoint, Checkpoint, WitnessPolicy};
 use tn_types::{Id32, TnError};
@@ -74,6 +74,8 @@ pub struct SyncClient {
     policy: WitnessPolicy,
     last_checkpoint_size: u64,
     last_checkpoint_ts: u64,
+    /// Unconfirmed server receipts monitored for Maximum Merge Delay violations.
+    pub pending_receipts: Vec<Receipt>,
 }
 
 impl SyncClient {
@@ -86,7 +88,13 @@ impl SyncClient {
             policy,
             last_checkpoint_size: 0,
             last_checkpoint_ts: 0,
+            pending_receipts: Vec::new(),
         }
+    }
+
+    /// Tracks a pending server receipt to monitor for Maximum Merge Delay violations.
+    pub fn track_receipt(&mut self, receipt: Receipt) {
+        self.pending_receipts.push(receipt);
     }
 
     /// Pushes unpushed local operations to the server transport.
@@ -94,7 +102,7 @@ impl SyncClient {
     /// # Errors
     /// Returns `TnError` if server rejects batch or authentication fails.
     pub fn push_ops<T: SyncTransport>(
-        &self,
+        &mut self,
         vault: &Vault,
         transport: &mut T,
         now_ms: u64,
@@ -164,6 +172,7 @@ impl SyncClient {
         for r in &resp.receipts {
             r.verify(&self.server_vk)?;
         }
+        self.pending_receipts.extend(resp.receipts.clone());
 
         if let Some(m) = max_seq {
             vault
@@ -209,6 +218,28 @@ impl SyncClient {
 
         // ─── Step 2: Fetch & Verify Account Head Consistency (S14 Guard) ────────
         let head = transport.get_account_head(&account_id)?;
+
+        // Scenario S10 Guard: Enforce Maximum Merge Delay (Claim C5)
+        for r in &self.pending_receipts {
+            if checkpoint.size >= r.mmd_epoch && head.tree_size < r.account_tree_size_after {
+                let bundle = EvidenceBundle::new_missed_merge_deadline(
+                    account_id,
+                    r.clone(),
+                    vec![checkpoint.clone()],
+                    now_ms,
+                );
+                vault
+                    .storage()
+                    .set_metadata("last_evidence_bundle", &bundle.to_cbor()?)?;
+
+                return Err(TnError::MergeDeadlineMissed {
+                    op_id: hex::encode(r.op_id.as_bytes()),
+                    deadline: r.mmd_epoch,
+                });
+            }
+        }
+        self.pending_receipts
+            .retain(|r| head.tree_size < r.account_tree_size_after);
         let local_report = vault.verify_local()?;
         let local_size = local_report.total_ops as u64;
 

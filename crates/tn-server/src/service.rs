@@ -53,6 +53,12 @@ impl Server {
         self.server_keys.verifying_keys()
     }
 
+    /// Access to server signing keys (e.g. for adversarial simulation).
+    #[must_use]
+    pub fn signing_keys(&self) -> &SigningKeys {
+        &self.server_keys
+    }
+
     /// Access to database.
     #[must_use]
     pub fn db(&self) -> &ServerDb {

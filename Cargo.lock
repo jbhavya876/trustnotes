@@ -1250,6 +1250,7 @@ dependencies = [
  "tn-core",
  "tn-crypto",
  "tn-merkle",
+ "tn-monitor",
  "tn-oplog",
  "tn-proto",
  "tn-server",
@@ -1268,6 +1269,7 @@ dependencies = [
  "predicates",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "thiserror",
  "tn-core",
@@ -1285,14 +1287,17 @@ version = "0.1.0"
 dependencies = [
  "ciborium",
  "getrandom 0.2.17",
+ "hex",
  "proptest",
  "rusqlite",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "thiserror",
  "tn-crypto",
  "tn-merkle",
+ "tn-monitor",
  "tn-oplog",
  "tn-proto",
  "tn-server",
@@ -1339,6 +1344,7 @@ version = "0.1.0"
 dependencies = [
  "tn-crypto",
  "tn-merkle",
+ "tn-proto",
  "tn-tlog",
  "tn-types",
 ]
@@ -1367,6 +1373,7 @@ dependencies = [
  "tn-crypto",
  "tn-merkle",
  "tn-oplog",
+ "tn-tlog",
  "tn-types",
 ]
 
@@ -1374,8 +1381,11 @@ dependencies = [
 name = "tn-release"
 version = "0.1.0"
 dependencies = [
+ "sha2",
+ "tempfile",
  "tn-crypto",
  "tn-merkle",
+ "tn-proto",
  "tn-tlog",
  "tn-types",
 ]

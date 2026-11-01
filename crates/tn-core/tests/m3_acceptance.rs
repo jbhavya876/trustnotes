@@ -292,7 +292,7 @@ fn test_m3_device_revocation_enforcement_s5() {
         )
         .unwrap();
 
-    let client = SyncClient::new(
+    let mut client = SyncClient::new(
         "origin.trustnotes.test".to_string(),
         server.verifying_keys(),
         policy,

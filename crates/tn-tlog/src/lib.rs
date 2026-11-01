@@ -19,6 +19,12 @@ use sha2::{Digest, Sha256};
 use tn_crypto::HybridSignature;
 use tn_types::TnError;
 
+pub mod ots;
+pub use ots::{
+    create_mock_ots_proof, verify_ots_proof, BitcoinBlockHeader, OtsOp, OtsProof,
+    OtsVerificationResult,
+};
+
 // ─── Epoch Leaf Hash ─────────────────────────────────────────────────────────
 
 /// Context label for epoch tree leaf computation.
@@ -58,7 +64,7 @@ pub fn epoch_leaf_hash(account_id: &[u8; 32], tree_size: u64, account_root: &[u8
 ///
 /// Binds a log `size` and `root_hash` with server hybrid signatures and
 /// at least k witness cosignatures per the configured [`WitnessPolicy`].
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Checkpoint {
     /// Origin string identifying the log (e.g., `"trustnotes-log.example.com"`).
     pub origin: String,
@@ -75,6 +81,22 @@ pub struct Checkpoint {
 }
 
 impl Checkpoint {
+    /// Serializes checkpoint to canonical CBOR bytes.
+    ///
+    /// # Errors
+    /// Returns `TnError::Decode` on serialization error.
+    pub fn to_cbor(&self) -> Result<Vec<u8>, TnError> {
+        tn_types::cbor::encode_canonical(self)
+    }
+
+    /// Deserializes checkpoint from canonical CBOR bytes.
+    ///
+    /// # Errors
+    /// Returns `TnError::Decode` on deserialization error.
+    pub fn from_cbor(bytes: &[u8]) -> Result<Self, TnError> {
+        tn_types::cbor::decode_canonical(bytes)
+    }
+
     /// Returns the canonical signed-note body bytes that the server and witnesses sign.
     ///
     /// Format: `"{origin}\n{size}\n{root_hash_base64}\n{timestamp_ms}\n"`
@@ -97,7 +119,7 @@ impl Checkpoint {
 ///
 /// A witness issues a cosignature only after verifying that the new checkpoint
 /// is consistent with the last cosigned checkpoint (i.e., the log never forks).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Cosignature {
     /// SHA-256 hash of the witness Ed25519 public key (key ID).
     pub witness_key_id: [u8; 32],

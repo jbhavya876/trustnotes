@@ -9,6 +9,7 @@ tn-types = { path = "../tn-types" }
 tn-crypto = { path = "../tn-crypto" }
 tn-oplog = { path = "../tn-oplog" }
 tn-merkle = { path = "../tn-merkle" }
+tn-tlog = { path = "../tn-tlog" }
 serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 base64 = "0.22"

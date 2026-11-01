@@ -15,6 +15,17 @@ use tn_crypto::{derive_device_id, HybridSignature, SigningKeys, VerifyingKeys};
 use tn_oplog::Op;
 use tn_types::{cbor, Id32, TnError};
 
+pub mod evidence;
+pub use evidence::{
+    BundleEvidence, EquivocationEvidence, EvidenceBundle, EvidenceKind, MergeDeadlineEvidence,
+    SplitViewEvidence,
+};
+
+pub mod release;
+pub use release::{
+    verify_binary_authenticity, BuilderAttestation, ReleaseEntry, ReleaseLog, ReleaseLogManifest,
+};
+
 /// Maximum allowed clock skew in milliseconds (60 seconds per SPEC §6.1).
 pub const MAX_CLOCK_SKEW_MS: u64 = 60_000;
 
@@ -203,6 +214,49 @@ impl Receipt {
             ml_dsa: self.sig_pq.clone(),
         };
         server_verifying_keys.verify(&msg, &sig)
+    }
+
+    /// Issues and signs a new Receipt using server signing keys.
+    ///
+    /// # Errors
+    /// Returns `TnError` if serialization fails.
+    #[allow(clippy::too_many_arguments)]
+    pub fn sign(
+        account_id: Id32,
+        op_id: Id32,
+        index: u64,
+        account_tree_size_after: u64,
+        server_time: u64,
+        mmd_epoch: u64,
+        server_keys: &SigningKeys,
+    ) -> Result<Self, TnError> {
+        let env = ReceiptEnvelope {
+            v: 1,
+            account_id,
+            op_id,
+            index,
+            account_tree_size_after,
+            server_time,
+            mmd_epoch,
+        };
+        let cbor_bytes = cbor::encode_canonical(&env)?;
+        let mut msg = Vec::with_capacity(LABEL_RECEIPT_SIG.len() + cbor_bytes.len());
+        msg.extend_from_slice(LABEL_RECEIPT_SIG.as_bytes());
+        msg.extend_from_slice(&cbor_bytes);
+
+        let sig = server_keys.sign(&msg);
+
+        Ok(Self {
+            v: 1,
+            account_id,
+            op_id,
+            index,
+            account_tree_size_after,
+            server_time,
+            mmd_epoch,
+            sig_ed: sig.ed25519,
+            sig_pq: sig.ml_dsa,
+        })
     }
 }
 

@@ -9,5 +9,6 @@ tn-types = { path = "../tn-types" }
 tn-crypto = { path = "../tn-crypto" }
 tn-merkle = { path = "../tn-merkle" }
 tn-tlog = { path = "../tn-tlog" }
+tn-proto = { path = "../tn-proto" }
 
 [dev-dependencies]

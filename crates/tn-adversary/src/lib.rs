@@ -409,4 +409,219 @@ mod tests {
         // S7 assertion: MUST detect split view and fail closed with TnError::SplitView
         assert!(matches!(split_view_result, Err(TnError::SplitView)));
     }
+
+    /// Scenario S10: Missed merge deadline (Claim C5).
+    ///
+    /// Op was receipted by server with `mmd_epoch = 1`, but server published
+    /// subsequent checkpoints past `mmd_epoch` without including the op in the account tree.
+    /// Client MUST fail closed with `TnError::MergeDeadlineMissed` and export
+    /// an `EvidenceBundle`.
+    #[test]
+    fn adversary_scenario_s10_missed_merge_deadline() {
+        let (mut server, policy, w1, w2) = setup_test_env();
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("vault.db");
+        let (mut vault, _) = Vault::create_new(&db_path, Some("adv-pass")).unwrap();
+
+        let now_ms = 1_700_000_000_000u64;
+
+        // Register account on server
+        let dev_vk = vault.signing_keys_ref().verifying_keys();
+        let reg_req = AccountRegisterReq {
+            account_id: vault.account_id(),
+            aik_ed_pub: dev_vk.ed25519_bytes,
+            aik_pq_pub: dev_vk.mldsa65_bytes.clone(),
+            initial_op: None,
+            invite_token: None,
+        };
+        server.register_account(&reg_req, now_ms).unwrap();
+
+        // Local vault creates a note
+        let _ = vault.new_note("Test Note", "Body", vec![], None).unwrap();
+
+        let mut client = SyncClient::new(
+            "test.adversary.origin".to_string(),
+            server.verifying_keys(),
+            policy,
+        );
+
+        // Client pushes op, receives receipt with mmd_epoch
+        let deadline = {
+            let mut transport = AdversarialTransport::new(&mut server, dev_vk.clone(), now_ms);
+            let receipts = client.push_ops(&vault, &mut transport, now_ms).unwrap();
+            assert_eq!(receipts.len(), 1);
+            receipts[0].mmd_epoch
+        };
+
+        // Adversary publishes checkpoints past the merge deadline (e.g. size >= deadline)
+        let mut cp = Checkpoint {
+            origin: "test.adversary.origin".to_string(),
+            size: deadline,
+            root_hash: [0x55; 32],
+            timestamp_ms: now_ms + 100,
+            server_sig: tn_crypto::HybridSignature {
+                ed25519: [0u8; 64],
+                ml_dsa: vec![],
+            },
+            cosignatures: vec![
+                Cosignature {
+                    witness_key_id: w1,
+                    timestamp_ms: now_ms + 100,
+                    sig_ed: [0u8; 64],
+                },
+                Cosignature {
+                    witness_key_id: w2,
+                    timestamp_ms: now_ms + 100,
+                    sig_ed: [0u8; 64],
+                },
+            ],
+        };
+        cp.server_sig = server.signing_keys().sign(&cp.signed_body());
+        server.set_latest_checkpoint(cp);
+
+        // Adversary simulates omission: account head tree size is forged to 0 (omitted from tree)
+        let mut transport = AdversarialTransport::new(&mut server, dev_vk, now_ms + 200);
+        transport.forged_head = Some(AccountHeadResp {
+            account_id: vault.account_id(),
+            tree_size: 0,
+            root_hash: [0u8; 32],
+        });
+
+        // Client attempts to pull and verify at epoch >= mmd_epoch
+        let pull_res = client.pull_and_verify(&mut vault, &transport, now_ms + 200);
+
+        // S10 assertion: MUST fail with MergeDeadlineMissed!
+        assert!(matches!(pull_res, Err(TnError::MergeDeadlineMissed { .. })));
+
+        // Verification: Evidence bundle was automatically persisted to metadata
+        let evidence_cbor = vault
+            .get_last_evidence_bundle()
+            .unwrap()
+            .expect("Evidence bundle recorded");
+        let bundle = tn_proto::EvidenceBundle::from_cbor(&evidence_cbor).unwrap();
+        assert_eq!(
+            bundle.bundle_kind,
+            tn_proto::EvidenceKind::MergeDeadlineMissed as u8
+        );
+        assert_eq!(bundle.account_id, vault.account_id());
+    }
+
+    /// Scenario S12: Server equivocation (Claim C5, C10).
+    ///
+    /// Server signs and publishes two conflicting checkpoint roots for the exact same size.
+    /// MonitorAuditor MUST detect equivocation and return `TnError::Equivocation`.
+    #[test]
+    fn adversary_scenario_s12_server_equivocation() {
+        let (server, policy, w1, w2) = setup_test_env();
+        let now_ms = 1_700_000_000_000u64;
+
+        let mut auditor = tn_monitor::MonitorAuditor::new(
+            "test.adversary.origin".to_string(),
+            server.verifying_keys(),
+            policy,
+        );
+
+        // Checkpoint A at size 10
+        let mut cp_a = Checkpoint {
+            origin: "test.adversary.origin".to_string(),
+            size: 10,
+            root_hash: [0xAA; 32],
+            timestamp_ms: now_ms,
+            server_sig: tn_crypto::HybridSignature {
+                ed25519: [0u8; 64],
+                ml_dsa: vec![],
+            },
+            cosignatures: vec![
+                Cosignature {
+                    witness_key_id: w1,
+                    timestamp_ms: now_ms,
+                    sig_ed: [0u8; 64],
+                },
+                Cosignature {
+                    witness_key_id: w2,
+                    timestamp_ms: now_ms,
+                    sig_ed: [0u8; 64],
+                },
+            ],
+        };
+        cp_a.server_sig = server.signing_keys().sign(&cp_a.signed_body());
+
+        // Checkpoint B at same size 10 with conflicting root [0xBB; 32]
+        let mut cp_b = Checkpoint {
+            origin: "test.adversary.origin".to_string(),
+            size: 10,
+            root_hash: [0xBB; 32],
+            timestamp_ms: now_ms,
+            server_sig: tn_crypto::HybridSignature {
+                ed25519: [0u8; 64],
+                ml_dsa: vec![],
+            },
+            cosignatures: vec![
+                Cosignature {
+                    witness_key_id: w1,
+                    timestamp_ms: now_ms,
+                    sig_ed: [0u8; 64],
+                },
+                Cosignature {
+                    witness_key_id: w2,
+                    timestamp_ms: now_ms,
+                    sig_ed: [0u8; 64],
+                },
+            ],
+        };
+        cp_b.server_sig = server.signing_keys().sign(&cp_b.signed_body());
+
+        // Audit first checkpoint: passes
+        auditor.audit_checkpoint(&cp_a, None, now_ms).unwrap();
+
+        // Audit second conflicting checkpoint: MUST detect equivocation!
+        let err = auditor.audit_checkpoint(&cp_b, None, now_ms).unwrap_err();
+        assert!(matches!(err, TnError::Equivocation { epoch: 10 }));
+    }
+
+    /// Scenario S17: Unlogged server key change (Claim C10).
+    ///
+    /// Malicious server changes its signing key without a transparent key change log entry.
+    /// Monitor and client MUST reject with `TnError::BadSignature`.
+    #[test]
+    fn adversary_scenario_s17_unlogged_key_change() {
+        let (server, policy, w1, w2) = setup_test_env();
+        let now_ms = 1_700_000_000_000u64;
+
+        let mut auditor = tn_monitor::MonitorAuditor::new(
+            "test.adversary.origin".to_string(),
+            server.verifying_keys(),
+            policy,
+        );
+
+        // Rogue attacker generates new signing key not matching pinned server_vk
+        let rogue_keys = SigningKeys::generate().unwrap();
+
+        let mut cp_rogue = Checkpoint {
+            origin: "test.adversary.origin".to_string(),
+            size: 1,
+            root_hash: [0x55; 32],
+            timestamp_ms: now_ms,
+            server_sig: tn_crypto::HybridSignature {
+                ed25519: [0u8; 64],
+                ml_dsa: vec![],
+            },
+            cosignatures: vec![
+                Cosignature {
+                    witness_key_id: w1,
+                    timestamp_ms: now_ms,
+                    sig_ed: [0u8; 64],
+                },
+                Cosignature {
+                    witness_key_id: w2,
+                    timestamp_ms: now_ms,
+                    sig_ed: [0u8; 64],
+                },
+            ],
+        };
+        cp_rogue.server_sig = rogue_keys.sign(&cp_rogue.signed_body());
+
+        let res = auditor.audit_checkpoint(&cp_rogue, None, now_ms);
+        assert!(matches!(res, Err(TnError::BadSignature)));
+    }
 }
