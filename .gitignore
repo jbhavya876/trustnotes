@@ -1,9 +1,47 @@
+# Build and target artifacts
 target/
 /target
+**/target/
 fuzz/target/
+
+# Lockfile backups
 *.lock.bak
+
+# Local secrets & environment configuration
 .env
-.env.local
+.env.*
+!.env.example
 *.pem
 *.key
-# Never commit real secrets
+*.p12
+*.pfx
+*.cert
+*.crt
+
+# SQLite local databases and journals
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# TrustNotes local evidence bundles and tokens
+*.tnevidence
+*.auth_token
+
+# Logs and runtime dumps
+*.log
+*.crash
+core.*
+
+# Editor and OS metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.bak
