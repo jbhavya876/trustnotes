@@ -10,7 +10,8 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use tn_crypto::{HybridSignature, SigningKeys, VerifyingKeys};
+use tn_crypto::labels::{LABEL_DEVICE_CERT, LABEL_GOSSIP_SIG};
+use tn_crypto::{derive_device_id, HybridSignature, SigningKeys, VerifyingKeys};
 use tn_oplog::Op;
 use tn_types::{cbor, Id32, TnError};
 
@@ -299,6 +300,263 @@ pub struct AccountRegisterReq {
     pub invite_token: Option<String>,
 }
 
+/// Canonical envelope for AIK signature over a device certificate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeviceCertEnvelope<'a> {
+    pub v: u32,
+    pub account_id: Id32,
+    pub device_id: Id32,
+    pub dsk_ed_pub: [u8; 32],
+    pub dsk_pq_pub: &'a [u8],
+    pub dtk_pub: &'a [u8],
+    pub issued_at: u64,
+    pub expires_at: Option<u64>,
+}
+
+/// Device authorization certificate cross-signed by the Account Identity Key (AIK).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeviceCertificate {
+    /// Protocol version (1).
+    pub v: u32,
+    /// Account identifier.
+    pub account_id: Id32,
+    /// Device identifier: SHA-256(dsk_ed_pub || dsk_pq_pub).
+    pub device_id: Id32,
+    /// Device Signing Key (Ed25519) public key bytes.
+    pub dsk_ed_pub: [u8; 32],
+    /// Device Signing Key (ML-DSA-65) public key bytes.
+    pub dsk_pq_pub: Vec<u8>,
+    /// Device Transport Key (X-Wing) public key bytes.
+    pub dtk_pub: Vec<u8>,
+    /// Certificate issuance timestamp (Unix ms).
+    pub issued_at: u64,
+    /// Optional expiration timestamp (Unix ms, null = perpetual).
+    pub expires_at: Option<u64>,
+    /// AIK-Ed25519 signature over canonical envelope.
+    #[serde(with = "tn_types::serde_bytes_64")]
+    pub sig_aik_ed: [u8; 64],
+    /// AIK-ML-DSA-65 signature over canonical envelope.
+    pub sig_aik_pq: Vec<u8>,
+}
+
+impl DeviceCertificate {
+    /// Issues a new DeviceCertificate cross-signed by AIK.
+    ///
+    /// # Errors
+    /// Returns `TnError::Decode` if canonical CBOR serialization fails.
+    pub fn issue(
+        account_id: Id32,
+        dsk_vk: &VerifyingKeys,
+        dtk_pub: Vec<u8>,
+        issued_at: u64,
+        expires_at: Option<u64>,
+        aik_keys: &SigningKeys,
+    ) -> Result<Self, TnError> {
+        let device_id = derive_device_id(&dsk_vk.ed25519_bytes, &dsk_vk.mldsa65_bytes);
+        let envelope = DeviceCertEnvelope {
+            v: 1,
+            account_id,
+            device_id,
+            dsk_ed_pub: dsk_vk.ed25519_bytes,
+            dsk_pq_pub: &dsk_vk.mldsa65_bytes,
+            dtk_pub: &dtk_pub,
+            issued_at,
+            expires_at,
+        };
+        let cbor_bytes = cbor::encode_canonical(&envelope)?;
+        let mut msg = Vec::with_capacity(LABEL_DEVICE_CERT.len() + cbor_bytes.len());
+        msg.extend_from_slice(LABEL_DEVICE_CERT.as_bytes());
+        msg.extend_from_slice(&cbor_bytes);
+
+        let sig = aik_keys.sign(&msg);
+
+        Ok(Self {
+            v: 1,
+            account_id,
+            device_id,
+            dsk_ed_pub: dsk_vk.ed25519_bytes,
+            dsk_pq_pub: dsk_vk.mldsa65_bytes.clone(),
+            dtk_pub,
+            issued_at,
+            expires_at,
+            sig_aik_ed: sig.ed25519,
+            sig_aik_pq: sig.ml_dsa,
+        })
+    }
+
+    /// Verifies the certificate against AIK verifying keys.
+    ///
+    /// # Errors
+    /// Returns `TnError::BadSignature` if device_id or AIK hybrid signature is invalid.
+    pub fn verify(&self, aik_vk: &VerifyingKeys) -> Result<(), TnError> {
+        let derived_id = derive_device_id(&self.dsk_ed_pub, &self.dsk_pq_pub);
+        if derived_id != self.device_id {
+            return Err(TnError::BadSignature);
+        }
+
+        let envelope = DeviceCertEnvelope {
+            v: self.v,
+            account_id: self.account_id,
+            device_id: self.device_id,
+            dsk_ed_pub: self.dsk_ed_pub,
+            dsk_pq_pub: &self.dsk_pq_pub,
+            dtk_pub: &self.dtk_pub,
+            issued_at: self.issued_at,
+            expires_at: self.expires_at,
+        };
+        let cbor_bytes = cbor::encode_canonical(&envelope)?;
+        let mut msg = Vec::with_capacity(LABEL_DEVICE_CERT.len() + cbor_bytes.len());
+        msg.extend_from_slice(LABEL_DEVICE_CERT.as_bytes());
+        msg.extend_from_slice(&cbor_bytes);
+
+        let hybrid_sig = HybridSignature {
+            ed25519: self.sig_aik_ed,
+            ml_dsa: self.sig_aik_pq.clone(),
+        };
+
+        aik_vk.verify(&msg, &hybrid_sig)
+    }
+
+    /// Accessor for device verifying keys.
+    #[must_use]
+    pub fn device_verifying_keys(&self) -> VerifyingKeys {
+        VerifyingKeys {
+            ed25519_bytes: self.dsk_ed_pub,
+            mldsa65_bytes: self.dsk_pq_pub.clone(),
+        }
+    }
+}
+
+/// Payload for `device-revoke` (kind 4) operations.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeviceRevokePayload {
+    /// Protocol version (1).
+    pub v: u32,
+    /// Account identifier.
+    pub account_id: Id32,
+    /// Target device identifier being revoked.
+    pub target_device_id: Id32,
+    /// Timestamp of revocation (Unix ms).
+    pub revoked_at: u64,
+    /// Optional revocation reason string.
+    pub reason: Option<String>,
+}
+
+/// Payload envelope for device gossip messages.
+#[derive(Debug, Serialize, Deserialize)]
+struct DeviceGossipEnvelope {
+    v: u32,
+    account_id: Id32,
+    device_id: Id32,
+    tree_size: u64,
+    root_hash: [u8; 32],
+    checkpoint_size: u64,
+    checkpoint_root: [u8; 32],
+    timestamp_ms: u64,
+}
+
+/// Device gossip message for peer-to-peer split-view detection (SPEC §5, Claim C4).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeviceGossip {
+    /// Protocol version (1).
+    pub v: u32,
+    /// Account identifier.
+    pub account_id: Id32,
+    /// Reporting device identifier.
+    pub device_id: Id32,
+    /// Observed account tree size.
+    pub tree_size: u64,
+    /// Observed account Merkle root hash.
+    pub root_hash: [u8; 32],
+    /// Observed global checkpoint log size.
+    pub checkpoint_size: u64,
+    /// Observed global checkpoint root hash.
+    pub checkpoint_root: [u8; 32],
+    /// Timestamp when gossip was signed (Unix ms).
+    pub timestamp_ms: u64,
+    /// Ed25519 signature over canonical gossip envelope.
+    #[serde(with = "tn_types::serde_bytes_64")]
+    pub sig_ed: [u8; 64],
+    /// ML-DSA-65 signature over canonical gossip envelope.
+    pub sig_pq: Vec<u8>,
+}
+
+impl DeviceGossip {
+    /// Creates and signs a new device gossip message.
+    ///
+    /// # Errors
+    /// Returns `TnError` if serialization fails.
+    #[allow(clippy::too_many_arguments)]
+    pub fn sign(
+        account_id: Id32,
+        device_id: Id32,
+        tree_size: u64,
+        root_hash: [u8; 32],
+        checkpoint_size: u64,
+        checkpoint_root: [u8; 32],
+        timestamp_ms: u64,
+        signing_keys: &SigningKeys,
+    ) -> Result<Self, TnError> {
+        let envelope = DeviceGossipEnvelope {
+            v: 1,
+            account_id,
+            device_id,
+            tree_size,
+            root_hash,
+            checkpoint_size,
+            checkpoint_root,
+            timestamp_ms,
+        };
+        let cbor_bytes = cbor::encode_canonical(&envelope)?;
+        let mut msg = Vec::with_capacity(LABEL_GOSSIP_SIG.len() + cbor_bytes.len());
+        msg.extend_from_slice(LABEL_GOSSIP_SIG.as_bytes());
+        msg.extend_from_slice(&cbor_bytes);
+
+        let hybrid_sig = signing_keys.sign(&msg);
+
+        Ok(Self {
+            v: 1,
+            account_id,
+            device_id,
+            tree_size,
+            root_hash,
+            checkpoint_size,
+            checkpoint_root,
+            timestamp_ms,
+            sig_ed: hybrid_sig.ed25519,
+            sig_pq: hybrid_sig.ml_dsa,
+        })
+    }
+
+    /// Verifies device gossip signature against reporting device's verifying keys.
+    ///
+    /// # Errors
+    /// Returns `TnError::BadSignature` if signature is invalid.
+    pub fn verify(&self, device_vk: &VerifyingKeys) -> Result<(), TnError> {
+        let envelope = DeviceGossipEnvelope {
+            v: self.v,
+            account_id: self.account_id,
+            device_id: self.device_id,
+            tree_size: self.tree_size,
+            root_hash: self.root_hash,
+            checkpoint_size: self.checkpoint_size,
+            checkpoint_root: self.checkpoint_root,
+            timestamp_ms: self.timestamp_ms,
+        };
+        let cbor_bytes = cbor::encode_canonical(&envelope)?;
+        let mut msg = Vec::with_capacity(LABEL_GOSSIP_SIG.len() + cbor_bytes.len());
+        msg.extend_from_slice(LABEL_GOSSIP_SIG.as_bytes());
+        msg.extend_from_slice(&cbor_bytes);
+
+        let hybrid_sig = HybridSignature {
+            ed25519: self.sig_ed,
+            ml_dsa: self.sig_pq.clone(),
+        };
+
+        device_vk.verify(&msg, &hybrid_sig)
+    }
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -436,6 +694,39 @@ mod tests {
         tampered.index = 999;
         assert!(matches!(
             tampered.verify(&server_vk),
+            Err(TnError::BadSignature)
+        ));
+    }
+
+    #[test]
+    fn test_device_certificate_issue_verify_and_tamper() {
+        let (aik_sk, aik_vk) = make_test_keys();
+        let (_dsk_sk, dsk_vk) = make_test_keys();
+        let account_id = Id32::from_bytes([0x12; 32]);
+        let dtk_pub = vec![0x33; 32];
+        let now_ms = 1_700_000_000_000u64;
+
+        let cert =
+            DeviceCertificate::issue(account_id, &dsk_vk, dtk_pub, now_ms, None, &aik_sk).unwrap();
+
+        assert_eq!(
+            cert.device_id,
+            derive_device_id(&dsk_vk.ed25519_bytes, &dsk_vk.mldsa65_bytes)
+        );
+        assert!(cert.verify(&aik_vk).is_ok());
+
+        // Tamper with cert account_id
+        let mut tampered = cert.clone();
+        tampered.account_id = Id32::from_bytes([0x99; 32]);
+        assert!(matches!(
+            tampered.verify(&aik_vk),
+            Err(TnError::BadSignature)
+        ));
+
+        // Verification with wrong AIK fails
+        let (_, wrong_aik_vk) = make_test_keys();
+        assert!(matches!(
+            cert.verify(&wrong_aik_vk),
             Err(TnError::BadSignature)
         ));
     }

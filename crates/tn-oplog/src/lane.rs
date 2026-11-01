@@ -7,7 +7,7 @@
 //! - Hash chaining: `lane_prev` points to previous `op_id`.
 //! - Any gap or fork immediately emits `TnError::OrderViolation`.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tn_types::{Id32, TnError};
 
 use crate::op::Op;
@@ -72,6 +72,7 @@ impl DeviceLaneTracker {
 #[derive(Debug, Default, Clone)]
 pub struct LaneRegistry {
     lanes: HashMap<Id32, DeviceLaneTracker>,
+    revoked_devices: HashSet<Id32>,
 }
 
 impl LaneRegistry {
@@ -80,14 +81,31 @@ impl LaneRegistry {
     pub fn new() -> Self {
         Self {
             lanes: HashMap::new(),
+            revoked_devices: HashSet::new(),
         }
+    }
+
+    /// Marks a device as revoked.
+    pub fn revoke_device(&mut self, device_id: Id32) {
+        self.revoked_devices.insert(device_id);
+    }
+
+    /// Checks if a device is revoked.
+    #[must_use]
+    pub fn is_revoked(&self, device_id: &Id32) -> bool {
+        self.revoked_devices.contains(device_id)
     }
 
     /// Verifies continuity and advances the lane on success.
     ///
     /// # Errors
+    /// Returns `TnError::RevokedDevice` if authoring device has been revoked.
     /// Returns `TnError::OrderViolation` if continuity check or advance fails.
     pub fn record_op(&mut self, op: &Op, op_id: Id32) -> Result<(), TnError> {
+        if self.is_revoked(&op.device_id) {
+            return Err(TnError::RevokedDevice);
+        }
+
         let tracker = self
             .lanes
             .entry(op.device_id)
@@ -160,6 +178,28 @@ mod tests {
         assert!(matches!(
             reg.record_op(&op_gap, id),
             Err(TnError::OrderViolation)
+        ));
+    }
+
+    #[test]
+    fn test_lane_revoked_device_rejected() {
+        let dev = Id32::from_bytes([0xBB; 32]);
+        let mut reg = LaneRegistry::new();
+
+        let op0 = make_test_op(dev, 0, None);
+        let id0 = Id32::from_bytes([0x10; 32]);
+        assert!(reg.record_op(&op0, id0).is_ok());
+
+        // Revoke device
+        reg.revoke_device(dev);
+        assert!(reg.is_revoked(&dev));
+
+        // Subsequent op from revoked device MUST be rejected
+        let op1 = make_test_op(dev, 1, Some(id0));
+        let id1 = Id32::from_bytes([0x11; 32]);
+        assert!(matches!(
+            reg.record_op(&op1, id1),
+            Err(TnError::RevokedDevice)
         ));
     }
 }

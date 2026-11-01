@@ -7,14 +7,15 @@ use std::path::Path;
 use tn_crypto::labels::LABEL_SIG_OP;
 use tn_crypto::{
     decode_recovery_key, derive_account_id, derive_account_root, derive_aik_ed_seed,
-    derive_aik_pq_seed, derive_lsk_from_passphrase, derive_vault_key, encode_recovery_key,
-    open_note_payload, seal_note_payload, unwrap_note_key, wrap_note_key, AccountRoot,
-    LocalStorageKey, NoteKey, RecoveryKey, SigningKeys, VaultKey,
+    derive_aik_pq_seed, derive_device_id, derive_lsk_from_passphrase, derive_vault_key,
+    encode_recovery_key, open_note_payload, seal_note_payload, unwrap_note_key, wrap_note_key,
+    AccountRoot, LocalStorageKey, NoteKey, RecoveryKey, SigningKeys, VaultKey, VerifyingKeys,
 };
 use tn_oplog::{
     compute_ct_hash, compute_op_aad, compute_op_id, ConflictStatus, Hlc, LaneRegistry,
     NoteDagTracker, Op, OpHeader, Payload,
 };
+use tn_proto::{DeviceCertificate, DeviceGossip, DeviceRevokePayload};
 use tn_types::{cbor, Id16, Id32, OpKind, TnError};
 
 use crate::search::SearchIndex;
@@ -212,6 +213,11 @@ impl Vault {
     fn rebuild_state(&mut self) -> Result<(), TnError> {
         let ops = self.storage.get_all_ops()?;
         for (op_id, op) in ops {
+            if op.kind == OpKind::DeviceRevoke {
+                if let Ok(payload) = cbor::decode_canonical::<DeviceRevokePayload>(&op.ct) {
+                    self.lanes.revoke_device(payload.target_device_id);
+                }
+            }
             self.lanes.record_op(&op, op_id)?;
             self.last_hlc = Some(match self.last_hlc {
                 Some(prev) => Hlc::update(&prev, &op.hlc),
@@ -478,8 +484,10 @@ impl Vault {
         full_ct.extend_from_slice(&first_op.nonce);
         full_ct.extend_from_slice(&first_op.ct);
         let pt = open_note_payload(&key, &aad, &full_ct)?;
-        let p: Payload = serde_json::from_slice(&pt)
-            .map_err(|e| TnError::Internal(format!("Decode payload error: {e}")))?;
+        let p: Payload = cbor::decode_canonical(&pt).or_else(|_| {
+            serde_json::from_slice(&pt)
+                .map_err(|e| TnError::Internal(format!("Decode payload error: {e}")))
+        })?;
         let created_at = p.created_at;
 
         let heads = match tracker.status() {
@@ -662,8 +670,10 @@ impl Vault {
         full_ct.extend_from_slice(&latest_op.ct);
 
         let pt = open_note_payload(&nk, &aad, &full_ct)?;
-        let payload: Payload = serde_json::from_slice(&pt)
-            .map_err(|e| TnError::Internal(format!("Decode payload error: {e}")))?;
+        let payload: Payload = cbor::decode_canonical(&pt).or_else(|_| {
+            serde_json::from_slice(&pt)
+                .map_err(|e| TnError::Internal(format!("Decode payload error: {e}")))
+        })?;
 
         let summary = NoteSummary {
             object_id,
@@ -716,9 +726,25 @@ impl Vault {
     /// if any operation fails verification.
     pub fn verify_local(&self) -> Result<VerificationReport, TnError> {
         let ops = self.storage.get_all_ops()?;
-        let verifying_keys = self.signing_keys.verifying_keys();
         let mut lanes = LaneRegistry::new();
         let mut note_keys: HashMap<Id16, NoteKey> = HashMap::new();
+        let mut device_keys_map: HashMap<Id32, VerifyingKeys> = HashMap::new();
+
+        // 0. Register known device verifying keys
+        let ed_seed = derive_aik_ed_seed(&self.account_root);
+        let pq_seed = derive_aik_pq_seed(&self.account_root);
+        let aik_keys = SigningKeys::from_seeds(&ed_seed, &pq_seed);
+        device_keys_map.insert(self.account_id, aik_keys.verifying_keys());
+        device_keys_map.insert(self.device_id, self.signing_keys.verifying_keys());
+
+        // Pre-populate enrolled devices from DeviceAdd ops
+        for (_, op) in &ops {
+            if op.kind == OpKind::DeviceAdd {
+                if let Ok(cert) = cbor::decode_canonical::<DeviceCertificate>(&op.ct) {
+                    device_keys_map.insert(cert.device_id, cert.device_verifying_keys());
+                }
+            }
+        }
 
         let total_ops = ops.len();
         let mut verified_ops = 0;
@@ -737,7 +763,7 @@ impl Vault {
                 return Err(TnError::CiphertextTampered);
             }
 
-            // 3. Verify hybrid signatures
+            // 3. Verify hybrid signatures using author device verifying keys
             let mut sig_msg = Vec::with_capacity(LABEL_SIG_OP.len() + 32);
             sig_msg.extend_from_slice(LABEL_SIG_OP.as_bytes());
             sig_msg.extend_from_slice(op_id.as_bytes());
@@ -746,7 +772,10 @@ impl Vault {
                 ed25519: op.sig_ed,
                 ml_dsa: op.sig_pq.clone(),
             };
-            verifying_keys.verify(&sig_msg, &hybrid_sig)?;
+            let author_vk = device_keys_map
+                .get(&op.device_id)
+                .ok_or(TnError::BadSignature)?;
+            author_vk.verify(&sig_msg, &hybrid_sig)?;
 
             // 4. Verify lane continuity
             lanes.record_op(op, *op_id)?;
@@ -866,6 +895,228 @@ impl Vault {
         self.device_id
     }
 
+    /// Enrolls an additional device under this account (ADR-0002).
+    ///
+    /// Issues a canonical `DeviceCertificate` cross-signed by the Account Identity Key (AIK),
+    /// generates a `DeviceAdd` (kind 3) operation on this device's lane, and stores it.
+    ///
+    /// # Errors
+    /// Returns `TnError` if certificate issuance or op signing fails.
+    pub fn enroll_device(
+        &mut self,
+        new_device_vk: &VerifyingKeys,
+        dtk_pub: Vec<u8>,
+        expires_at: Option<u64>,
+    ) -> Result<(DeviceCertificate, Id32), TnError> {
+        let now_ms = Hlc::current_physical_ms();
+        let ed_seed = derive_aik_ed_seed(&self.account_root);
+        let pq_seed = derive_aik_pq_seed(&self.account_root);
+        let aik_keys = SigningKeys::from_seeds(&ed_seed, &pq_seed);
+
+        let cert = DeviceCertificate::issue(
+            self.account_id,
+            new_device_vk,
+            dtk_pub,
+            now_ms,
+            expires_at,
+            &aik_keys,
+        )?;
+
+        let cert_bytes = cbor::encode_canonical(&cert)?;
+        let lane_seq = self.lanes.next_seq(&self.device_id);
+        let lane_prev = self.lanes.get_tip(&self.device_id);
+        let hlc = Hlc::now(self.last_hlc.as_ref());
+        self.last_hlc = Some(hlc);
+
+        let ct_hash = compute_ct_hash(&cert_bytes);
+        let mut obj_bytes = [0u8; 16];
+        obj_bytes.copy_from_slice(&cert.device_id.as_bytes()[..16]);
+        let object_id = Id16::from_bytes(obj_bytes);
+
+        let header = OpHeader {
+            v: 1,
+            account_id: self.account_id,
+            device_id: self.device_id,
+            lane_seq,
+            lane_prev,
+            hlc,
+            kind: OpKind::DeviceAdd,
+            object_id,
+            nk_wrap: None,
+            nonce: [0u8; 24],
+            deps: vec![],
+            ct_hash,
+        };
+
+        let op_id = compute_op_id(&header)?;
+        let mut sig_msg = Vec::with_capacity(LABEL_SIG_OP.len() + 32);
+        sig_msg.extend_from_slice(LABEL_SIG_OP.as_bytes());
+        sig_msg.extend_from_slice(op_id.as_bytes());
+        let hybrid_sig = self.signing_keys.sign(&sig_msg);
+
+        let op = Op {
+            v: 1,
+            account_id: self.account_id,
+            device_id: self.device_id,
+            lane_seq,
+            lane_prev,
+            hlc,
+            kind: OpKind::DeviceAdd,
+            object_id,
+            nk_wrap: None,
+            nonce: [0u8; 24],
+            deps: vec![],
+            ct: cert_bytes,
+            sig_ed: hybrid_sig.ed25519,
+            sig_pq: hybrid_sig.ml_dsa,
+        };
+
+        self.storage.insert_op(&op, op_id)?;
+        self.lanes.record_op(&op, op_id)?;
+
+        Ok((cert, op_id))
+    }
+
+    /// Initializes a newly enrolled device vault from an enrollment package.
+    ///
+    /// # Errors
+    /// Returns `TnError` if certificate verification fails or storage initialization fails.
+    pub fn from_enrollment(
+        db_path: &Path,
+        passphrase: Option<&str>,
+        account_root_bytes: [u8; 32],
+        device_ed_seed: [u8; 32],
+        device_pq_seed: [u8; 32],
+        device_cert: &DeviceCertificate,
+    ) -> Result<Self, TnError> {
+        let storage = Storage::open(db_path)?;
+        let device_keys = SigningKeys::from_seeds(&device_ed_seed, &device_pq_seed);
+        let device_vk = device_keys.verifying_keys();
+        let derived_dev_id = derive_device_id(&device_vk.ed25519_bytes, &device_vk.mldsa65_bytes);
+
+        if derived_dev_id != device_cert.device_id {
+            return Err(TnError::BadSignature);
+        }
+
+        let ar = AccountRoot::from_bytes(account_root_bytes);
+        let vk = derive_vault_key(&ar);
+
+        // Verify device certificate using AIK derived from AR
+        let ed_seed = derive_aik_ed_seed(&ar);
+        let pq_seed = derive_aik_pq_seed(&ar);
+        let aik_keys = SigningKeys::from_seeds(&ed_seed, &pq_seed);
+        device_cert.verify(&aik_keys.verifying_keys())?;
+
+        let account_id = device_cert.account_id;
+        let device_id = device_cert.device_id;
+
+        let mut salt = [0u8; 16];
+        getrandom::getrandom(&mut salt)
+            .map_err(|e| TnError::Internal(format!("Salt generation failed: {e}")))?;
+
+        let p = passphrase.unwrap_or("");
+        let lsk = derive_lsk_from_passphrase(p, &salt)?;
+
+        storage.set_metadata("account_id", account_id.as_bytes())?;
+        storage.set_metadata("device_id", device_id.as_bytes())?;
+        storage.set_metadata("salt", &salt)?;
+
+        storage.set_keyring_slot("account_root", ar.expose_bytes(), &lsk)?;
+        storage.set_keyring_slot("vault_key", vk.expose_bytes(), &lsk)?;
+        storage.set_keyring_slot("ed_seed", &device_ed_seed, &lsk)?;
+        storage.set_keyring_slot("pq_seed", &device_pq_seed, &lsk)?;
+
+        let mut vault = Self {
+            storage,
+            account_id,
+            device_id,
+            account_root: ar,
+            vault_key: vk,
+            signing_keys: device_keys,
+            lsk,
+            lanes: LaneRegistry::new(),
+            search_index: SearchIndex::new(),
+            last_hlc: None,
+        };
+
+        vault.rebuild_state()?;
+        Ok(vault)
+    }
+
+    /// Revokes a device under this account by authoring a `DeviceRevoke` (kind 4) op.
+    ///
+    /// # Errors
+    /// Returns `TnError` if op generation or storage fails.
+    pub fn revoke_device(
+        &mut self,
+        target_device_id: Id32,
+        reason: Option<String>,
+    ) -> Result<Id32, TnError> {
+        let now_ms = Hlc::current_physical_ms();
+        let payload = DeviceRevokePayload {
+            v: 1,
+            account_id: self.account_id,
+            target_device_id,
+            revoked_at: now_ms,
+            reason,
+        };
+        let payload_bytes = cbor::encode_canonical(&payload)?;
+
+        let lane_seq = self.lanes.next_seq(&self.device_id);
+        let lane_prev = self.lanes.get_tip(&self.device_id);
+        let hlc = Hlc::now(self.last_hlc.as_ref());
+        self.last_hlc = Some(hlc);
+
+        let ct_hash = compute_ct_hash(&payload_bytes);
+        let mut obj_bytes = [0u8; 16];
+        obj_bytes.copy_from_slice(&target_device_id.as_bytes()[..16]);
+        let object_id = Id16::from_bytes(obj_bytes);
+
+        let header = OpHeader {
+            v: 1,
+            account_id: self.account_id,
+            device_id: self.device_id,
+            lane_seq,
+            lane_prev,
+            hlc,
+            kind: OpKind::DeviceRevoke,
+            object_id,
+            nk_wrap: None,
+            nonce: [0u8; 24],
+            deps: vec![],
+            ct_hash,
+        };
+
+        let op_id = compute_op_id(&header)?;
+        let mut sig_msg = Vec::with_capacity(LABEL_SIG_OP.len() + 32);
+        sig_msg.extend_from_slice(LABEL_SIG_OP.as_bytes());
+        sig_msg.extend_from_slice(op_id.as_bytes());
+        let hybrid_sig = self.signing_keys.sign(&sig_msg);
+
+        let op = Op {
+            v: 1,
+            account_id: self.account_id,
+            device_id: self.device_id,
+            lane_seq,
+            lane_prev,
+            hlc,
+            kind: OpKind::DeviceRevoke,
+            object_id,
+            nk_wrap: None,
+            nonce: [0u8; 24],
+            deps: vec![],
+            ct: payload_bytes,
+            sig_ed: hybrid_sig.ed25519,
+            sig_pq: hybrid_sig.ml_dsa,
+        };
+
+        self.storage.insert_op(&op, op_id)?;
+        self.lanes.record_op(&op, op_id)?;
+        self.lanes.revoke_device(target_device_id);
+
+        Ok(op_id)
+    }
+
     /// Access to signing keys.
     #[must_use]
     pub fn signing_keys_ref(&self) -> &SigningKeys {
@@ -885,6 +1136,10 @@ impl Vault {
     /// # Errors
     /// Returns `TnError` on failure.
     pub fn ingest_verified_op(&mut self, op: &Op, op_id: Id32) -> Result<(), TnError> {
+        if self.storage.has_op(op_id)? {
+            return Ok(());
+        }
+
         self.storage.insert_op(op, op_id)?;
         self.lanes.record_op(op, op_id)?;
         self.last_hlc = Some(match self.last_hlc {
@@ -894,45 +1149,157 @@ impl Vault {
 
         match op.kind {
             OpKind::Put => {
-                if let Some(wrapped) = &op.nk_wrap {
-                    let nk = unwrap_note_key(&self.vault_key, op.object_id, wrapped)?;
-                    let aad = compute_op_aad(
-                        op.v,
-                        op.account_id,
-                        op.device_id,
-                        op.lane_seq,
-                        op.object_id,
-                        op.kind,
-                    )?;
-                    let mut full_ct = Vec::with_capacity(24 + op.ct.len());
-                    full_ct.extend_from_slice(&op.nonce);
-                    full_ct.extend_from_slice(&op.ct);
+                let nk = if let Some(wrapped) = &op.nk_wrap {
+                    unwrap_note_key(&self.vault_key, op.object_id, wrapped)?
+                } else {
+                    let (key, _, _) = self.get_note_internal(op.object_id)?;
+                    key
+                };
 
-                    let pt = open_note_payload(&nk, &aad, &full_ct)?;
-                    let payload: Payload = cbor::decode_canonical(&pt).or_else(|_| {
-                        serde_json::from_slice(&pt)
-                            .map_err(|e| TnError::Internal(format!("Decode payload error: {e}")))
-                    })?;
+                let aad = compute_op_aad(
+                    op.v,
+                    op.account_id,
+                    op.device_id,
+                    op.lane_seq,
+                    op.object_id,
+                    op.kind,
+                )?;
+                let mut full_ct = Vec::with_capacity(24 + op.ct.len());
+                full_ct.extend_from_slice(&op.nonce);
+                full_ct.extend_from_slice(&op.ct);
 
-                    self.storage.save_materialized_note(
-                        op.object_id,
-                        op_id,
-                        "active",
-                        &payload,
-                        &self.lsk,
-                    )?;
-                    self.search_index.index_note(
-                        op.object_id,
-                        &payload.title,
-                        &payload.body_md,
-                        &payload.tags,
-                    );
-                }
+                let pt = open_note_payload(&nk, &aad, &full_ct)?;
+                let payload: Payload = cbor::decode_canonical(&pt).or_else(|_| {
+                    serde_json::from_slice(&pt)
+                        .map_err(|e| TnError::Internal(format!("Decode payload error: {e}")))
+                })?;
+
+                self.storage.save_materialized_note(
+                    op.object_id,
+                    op_id,
+                    "active",
+                    &payload,
+                    &self.lsk,
+                )?;
+                self.search_index.index_note(
+                    op.object_id,
+                    &payload.title,
+                    &payload.body_md,
+                    &payload.tags,
+                );
             }
             OpKind::Delete => {
                 self.search_index.remove_note(op.object_id);
             }
+            OpKind::DeviceRevoke => {
+                if let Ok(payload) = cbor::decode_canonical::<DeviceRevokePayload>(&op.ct) {
+                    self.lanes.revoke_device(payload.target_device_id);
+                }
+            }
             _ => {}
+        }
+
+        Ok(())
+    }
+
+    /// Creates a signed `DeviceGossip` message asserting local observed head and checkpoint (SPEC §5, Claim C4).
+    ///
+    /// # Errors
+    /// Returns `TnError` if signing fails.
+    pub fn create_gossip(
+        &self,
+        checkpoint_size: u64,
+        checkpoint_root: [u8; 32],
+    ) -> Result<DeviceGossip, TnError> {
+        let tree_size = self
+            .storage
+            .get_metadata("last_verified_tree_size")?
+            .and_then(|b| {
+                if b.len() == 8 {
+                    let mut arr = [0u8; 8];
+                    arr.copy_from_slice(&b);
+                    Some(u64::from_le_bytes(arr))
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(0);
+
+        let root_hash = self
+            .storage
+            .get_metadata("last_verified_account_root")?
+            .and_then(|b| {
+                if b.len() == 32 {
+                    let mut arr = [0u8; 32];
+                    arr.copy_from_slice(&b);
+                    Some(arr)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or([0u8; 32]);
+
+        let now_ms = Hlc::current_physical_ms();
+
+        DeviceGossip::sign(
+            self.account_id,
+            self.device_id,
+            tree_size,
+            root_hash,
+            checkpoint_size,
+            checkpoint_root,
+            now_ms,
+            &self.signing_keys,
+        )
+    }
+
+    /// Verifies peer device gossip message against local state to detect split-view attacks (Scenario S7, Claim C4).
+    ///
+    /// # Errors
+    /// Returns `TnError::SplitView` if peer observed a divergent root at the same tree size.
+    pub fn verify_gossip(
+        &self,
+        gossip: &DeviceGossip,
+        peer_vk: &VerifyingKeys,
+    ) -> Result<(), TnError> {
+        gossip.verify(peer_vk)?;
+
+        if gossip.account_id != self.account_id {
+            return Err(TnError::Internal("Gossip account mismatch".into()));
+        }
+
+        let local_tree_size = self
+            .storage
+            .get_metadata("last_verified_tree_size")?
+            .and_then(|b| {
+                if b.len() == 8 {
+                    let mut arr = [0u8; 8];
+                    arr.copy_from_slice(&b);
+                    Some(u64::from_le_bytes(arr))
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(0);
+
+        let local_root = self
+            .storage
+            .get_metadata("last_verified_account_root")?
+            .and_then(|b| {
+                if b.len() == 32 {
+                    let mut arr = [0u8; 32];
+                    arr.copy_from_slice(&b);
+                    Some(arr)
+                } else {
+                    None
+                }
+            });
+
+        if let Some(l_root) = local_root {
+            if local_tree_size == gossip.tree_size && l_root != gossip.root_hash {
+                // Scenario S7: Server presented different account roots for the exact same size to different devices!
+                return Err(TnError::SplitView);
+            }
         }
 
         Ok(())

@@ -206,6 +206,21 @@ impl ServerDb {
         }
     }
 
+    /// Revokes a device by setting its revoked_at_index.
+    pub fn revoke_device(
+        &self,
+        device_id: &[u8; 32],
+        revoked_at_index: i64,
+    ) -> Result<(), TnError> {
+        self.conn
+            .execute(
+                "UPDATE devices SET revoked_at_index = ?1 WHERE device_id = ?2",
+                params![revoked_at_index, device_id.as_slice()],
+            )
+            .map_err(|e| TnError::Internal(format!("Revoke device error: {e}")))?;
+        Ok(())
+    }
+
     /// Verifies schema conformity against `docs/METADATA.md` allowlist.
     ///
     /// # Errors

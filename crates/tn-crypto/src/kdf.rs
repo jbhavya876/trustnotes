@@ -77,6 +77,16 @@ pub fn derive_account_id(ed_pk: &[u8; 32], pq_pk: &[u8]) -> Id32 {
     Id32::from_bytes(hash)
 }
 
+/// Computes `device_id` from Device Signing Key public keys: SHA-256(`dsk_ed_pub` || `dsk_pq_pub`).
+#[must_use]
+pub fn derive_device_id(dsk_ed_pub: &[u8; 32], dsk_pq_pub: &[u8]) -> Id32 {
+    let mut hasher = Sha256::new();
+    hasher.update(dsk_ed_pub);
+    hasher.update(dsk_pq_pub);
+    let hash: [u8; 32] = hasher.finalize().into();
+    Id32::from_bytes(hash)
+}
+
 /// Derives a Local Storage Key (LSK) from a passphrase and 16-byte salt using Argon2id.
 ///
 /// Argon2id parameters (per `docs/CRYPTO.md §1`):

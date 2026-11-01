@@ -164,6 +164,29 @@ impl Sequencer {
             )
             .map_err(|e| TnError::Internal(format!("Update head failed: {e}")))?;
 
+        // Handle device enrollment or revocation side effects
+        match op.kind {
+            tn_types::OpKind::DeviceAdd => {
+                if let Ok(cert) =
+                    tn_types::cbor::decode_canonical::<tn_proto::DeviceCertificate>(&op.ct)
+                {
+                    let _ = db.insert_device(
+                        cert.device_id.as_bytes(),
+                        op.account_id.as_bytes(),
+                        &op.ct,
+                    );
+                }
+            }
+            tn_types::OpKind::DeviceRevoke => {
+                if let Ok(payload) =
+                    tn_types::cbor::decode_canonical::<tn_proto::DeviceRevokePayload>(&op.ct)
+                {
+                    let _ = db.revoke_device(payload.target_device_id.as_bytes(), index as i64);
+                }
+            }
+            _ => {}
+        }
+
         // 7. If receipt requested, generate signed receipt
         let receipt = if receipt_requested {
             let mmd_epoch = self.current_epoch + 10;

@@ -107,6 +107,8 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
     use tn_core::{sync::SyncClient, vault::Vault};
+    use tn_crypto::SigningKeys;
+    use tn_proto::AccountRegisterReq;
     use tn_tlog::{Cosignature, WitnessPolicy};
 
     fn setup_test_env() -> (Server, WitnessPolicy, [u8; 32], [u8; 32]) {
@@ -292,5 +294,119 @@ mod tests {
 
         let res = client.pull_and_verify(&mut vault, &transport, now_ms + 100);
         assert!(matches!(res, Err(TnError::RootMismatch)));
+    }
+
+    /// Scenario S7: Fork / Split View detection via device gossip (Claim C4, TRACEABILITY S7).
+    ///
+    /// Malicious server serves different account tree roots for the same tree size
+    /// to Device 1 and Device 2.
+    /// Device 1 and Device 2 exchange signed gossip messages.
+    /// Verification MUST fail closed with `TnError::SplitView`.
+    #[test]
+    fn adversary_scenario_s7_fork_split_view() {
+        let (mut server, policy, w1, w2) = setup_test_env();
+        let dir = tempdir().unwrap();
+
+        // 1. Device 1 creates vault and note
+        let db1_path = dir.path().join("dev1.db");
+        let (mut dev1, _) = Vault::create_new(&db1_path, Some("dev1-pass")).unwrap();
+        let _ = dev1.new_note("D1 Note", "Body 1", vec![], None).unwrap();
+
+        let dev1_vk = dev1.signing_keys_ref().verifying_keys();
+        let now_ms = 1_700_000_000_000u64;
+
+        // Device 2 keys
+        let dev2_ed_seed = [0x77u8; 32];
+        let dev2_pq_seed = [0x88u8; 32];
+        let dev2_keys = SigningKeys::from_seeds(&dev2_ed_seed, &dev2_pq_seed);
+        let dev2_vk = dev2_keys.verifying_keys();
+
+        let (cert, _) = dev1.enroll_device(&dev2_vk, vec![0x11; 32], None).unwrap();
+
+        // Register on server
+        let reg_req = AccountRegisterReq {
+            account_id: dev1.account_id(),
+            aik_ed_pub: dev1_vk.ed25519_bytes,
+            aik_pq_pub: dev1_vk.mldsa65_bytes.clone(),
+            initial_op: None,
+            invite_token: None,
+        };
+        server.register_account(&reg_req, now_ms).unwrap();
+
+        // Server publishes checkpoint
+        let mut cp = server.publish_epoch(now_ms).unwrap();
+        cp.cosignatures.push(Cosignature {
+            witness_key_id: w1,
+            timestamp_ms: now_ms,
+            sig_ed: [0u8; 64],
+        });
+        cp.cosignatures.push(Cosignature {
+            witness_key_id: w2,
+            timestamp_ms: now_ms,
+            sig_ed: [0u8; 64],
+        });
+        server.set_latest_checkpoint(cp);
+
+        let mut client1 = SyncClient::new(
+            "test.adversary.origin".to_string(),
+            server.verifying_keys(),
+            policy,
+        );
+        {
+            let mut t1 = AdversarialTransport::new(&mut server, dev1_vk.clone(), now_ms + 100);
+            let _ = client1.push_ops(&dev1, &mut t1, now_ms + 100).unwrap();
+        }
+
+        let mut cp2 = server.publish_epoch(now_ms + 150).unwrap();
+        cp2.cosignatures.push(Cosignature {
+            witness_key_id: w1,
+            timestamp_ms: now_ms + 150,
+            sig_ed: [0u8; 64],
+        });
+        cp2.cosignatures.push(Cosignature {
+            witness_key_id: w2,
+            timestamp_ms: now_ms + 150,
+            sig_ed: [0u8; 64],
+        });
+        server.set_latest_checkpoint(cp2);
+
+        let report1 = {
+            let t1 = AdversarialTransport::new(&mut server, dev1_vk, now_ms + 200);
+            client1
+                .pull_and_verify(&mut dev1, &t1, now_ms + 200)
+                .unwrap()
+        };
+
+        // 2. Device 2 initializes from enrollment
+        let db2_path = dir.path().join("dev2.db");
+        let dev2 = Vault::from_enrollment(
+            &db2_path,
+            Some("dev2-pass"),
+            *dev1.account_root().expose_bytes(),
+            dev2_ed_seed,
+            dev2_pq_seed,
+            &cert,
+        )
+        .unwrap();
+
+        // Adversary simulated: Device 2 observed a forked tree root (different root at size 2)
+        let forked_root = [0xFA; 32];
+        dev2.storage()
+            .set_metadata("last_verified_tree_size", &2u64.to_le_bytes())
+            .unwrap();
+        dev2.storage()
+            .set_metadata("last_verified_account_root", &forked_root)
+            .unwrap();
+
+        // 3. Device 2 creates gossip message of its observed state
+        let gossip_dev2 = dev2
+            .create_gossip(report1.checkpoint_log_size, [0x01; 32])
+            .unwrap();
+
+        // 4. Device 1 receives Device 2's gossip and verifies
+        let split_view_result = dev1.verify_gossip(&gossip_dev2, &dev2_vk);
+
+        // S7 assertion: MUST detect split view and fail closed with TnError::SplitView
+        assert!(matches!(split_view_result, Err(TnError::SplitView)));
     }
 }

@@ -191,7 +191,7 @@ impl Storage {
 
         self.conn
             .execute(
-                "INSERT INTO ops (op_id, account_id, device_id, lane_seq, lane_prev, kind, object_id, hlc_wall, hlc_counter, raw_cbor)
+                "INSERT OR IGNORE INTO ops (op_id, account_id, device_id, lane_seq, lane_prev, kind, object_id, hlc_wall, hlc_counter, raw_cbor)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                 params![
                     op_id.as_bytes().as_slice(),
@@ -208,6 +208,21 @@ impl Storage {
             )
             .map_err(|e| TnError::Internal(format!("Insert op failed: {e}")))?;
         Ok(())
+    }
+
+    /// Checks if an operation already exists in storage.
+    ///
+    /// # Errors
+    /// Returns `TnError::Internal` on SQL error.
+    pub fn has_op(&self, op_id: Id32) -> Result<bool, TnError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT 1 FROM ops WHERE op_id = ?1")
+            .map_err(|e| TnError::Internal(e.to_string()))?;
+        let exists = stmt
+            .exists(params![op_id.as_bytes().as_slice()])
+            .map_err(|e| TnError::Internal(e.to_string()))?;
+        Ok(exists)
     }
 
     /// Reads all stored ops in total order.

@@ -12,7 +12,6 @@
 
 use tn_crypto::VerifyingKeys;
 use tn_merkle::{verify_consistency, ConsistencyProof, MerkleRoot};
-use tn_oplog::Op;
 use tn_proto::{
     sign_request, AccountHeadResp, AuthHeaders, ConsistencyProofResp, OpFetchResp, OpSubmitReq,
     OpSubmitResp, Receipt,
@@ -100,14 +99,45 @@ impl SyncClient {
         transport: &mut T,
         now_ms: u64,
     ) -> Result<Vec<Receipt>, TnError> {
+        let last_pushed_seq = vault
+            .storage()
+            .get_metadata("last_pushed_lane_seq")?
+            .and_then(|bytes| {
+                if bytes.len() == 8 {
+                    let mut arr = [0u8; 8];
+                    arr.copy_from_slice(&bytes);
+                    Some(u64::from_le_bytes(arr))
+                } else {
+                    None
+                }
+            });
+
         let all_ops = vault.get_all_ops_internal()?;
-        if all_ops.is_empty() {
+        let mut ops_to_push = Vec::new();
+        let mut max_seq = last_pushed_seq;
+
+        for (_, op) in all_ops {
+            // Only push ops authored by this device
+            if op.device_id == vault.device_id() {
+                let should_push = match last_pushed_seq {
+                    Some(last) => op.lane_seq > last,
+                    None => true,
+                };
+                if should_push {
+                    if max_seq.is_none_or(|m| op.lane_seq > m) {
+                        max_seq = Some(op.lane_seq);
+                    }
+                    ops_to_push.push(op);
+                }
+            }
+        }
+
+        if ops_to_push.is_empty() {
             return Ok(vec![]);
         }
 
-        let ops: Vec<Op> = all_ops.into_iter().map(|(_, op)| op).collect();
         let submit_req = OpSubmitReq {
-            ops,
+            ops: ops_to_push,
             receipt_requested: true,
         };
 
@@ -133,6 +163,12 @@ impl SyncClient {
         // Verify all receipts returned by server
         for r in &resp.receipts {
             r.verify(&self.server_vk)?;
+        }
+
+        if let Some(m) = max_seq {
+            vault
+                .storage()
+                .set_metadata("last_pushed_lane_seq", &m.to_le_bytes())?;
         }
 
         Ok(resp.receipts)
@@ -176,44 +212,125 @@ impl SyncClient {
         let local_report = vault.verify_local()?;
         let local_size = local_report.total_ops as u64;
 
-        if head.tree_size < local_size {
-            return Err(TnError::Rollback); // Scenario S6: server served smaller head
+        let stored_size = vault
+            .storage()
+            .get_metadata("last_verified_tree_size")?
+            .and_then(|b| {
+                if b.len() == 8 {
+                    let mut arr = [0u8; 8];
+                    arr.copy_from_slice(&b);
+                    Some(u64::from_le_bytes(arr))
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(0);
+
+        let stored_root = vault
+            .storage()
+            .get_metadata("last_verified_account_root")?
+            .and_then(|b| {
+                if b.len() == 32 {
+                    let mut arr = [0u8; 32];
+                    arr.copy_from_slice(&b);
+                    Some(MerkleRoot::from_bytes(arr))
+                } else {
+                    None
+                }
+            });
+
+        // Scenario S6: Rollback guard
+        let is_rollback = if stored_size > 0 {
+            head.tree_size < stored_size
+        } else {
+            head.tree_size < local_size
+        };
+        if is_rollback {
+            return Err(TnError::Rollback);
         }
 
-        if local_size > 0 && head.tree_size > local_size {
-            let proof_resp = transport.get_account_consistency_proof(&account_id, local_size)?;
-            let consistency_proof = ConsistencyProof {
-                old_size: proof_resp.old_size,
-                new_size: proof_resp.new_size,
-                path: proof_resp.path,
-            };
+        let new_root = MerkleRoot::from_bytes(head.root_hash);
 
-            // S14 guard: compute local root from local ops and assert proof verifies
-            let local_ops = vault.get_all_ops_internal()?;
-            let mut local_tree = tn_merkle::MerkleTree::new();
-            for (id, _) in local_ops {
-                local_tree.append_leaf_hash(*id.as_bytes());
+        let after_idx = if stored_size > 0 {
+            if head.tree_size > stored_size {
+                let proof_resp =
+                    transport.get_account_consistency_proof(&account_id, stored_size)?;
+                let consistency_proof = ConsistencyProof {
+                    old_size: proof_resp.old_size,
+                    new_size: proof_resp.new_size,
+                    path: proof_resp.path,
+                };
+                let old_root = stored_root.ok_or_else(|| {
+                    TnError::Internal("Missing stored root for non-zero stored size".into())
+                })?;
+                verify_consistency(&old_root, &new_root, &consistency_proof)?;
+            } else if head.tree_size == stored_size {
+                let expected_root = stored_root.ok_or_else(|| {
+                    TnError::Internal("Missing stored root for non-zero stored size".into())
+                })?;
+                if head.root_hash != *expected_root.as_bytes() {
+                    return Err(TnError::RootMismatch);
+                }
             }
-            let old_root = local_tree.root();
-            let new_root = MerkleRoot::from_bytes(head.root_hash);
-
-            verify_consistency(&old_root, &new_root, &consistency_proof)?;
-        }
+            Some(stored_size - 1)
+        } else if local_size > 0 {
+            if head.tree_size > local_size {
+                let proof_resp =
+                    transport.get_account_consistency_proof(&account_id, local_size)?;
+                let consistency_proof = ConsistencyProof {
+                    old_size: proof_resp.old_size,
+                    new_size: proof_resp.new_size,
+                    path: proof_resp.path,
+                };
+                let local_ops = vault.get_all_ops_internal()?;
+                let mut local_tree = tn_merkle::MerkleTree::new();
+                for (id, _) in local_ops {
+                    local_tree.append_leaf_hash(*id.as_bytes());
+                }
+                let old_root = local_tree.root();
+                verify_consistency(&old_root, &new_root, &consistency_proof)?;
+            }
+            Some(local_size - 1)
+        } else {
+            None
+        };
 
         // ─── Step 3: Fetch & Verify Ops ────────────────────────────────────────
-        let after_idx = if local_size == 0 {
-            None
+        let fetch_threshold = if stored_size > 0 {
+            stored_size
         } else {
-            Some(local_size - 1)
+            local_size
         };
-        let fetch_resp = transport.fetch_ops(&account_id, after_idx, 100)?;
-        let ops_pulled = fetch_resp.ops.len();
 
-        for (op, _) in fetch_resp.ops {
-            // Ingest op into vault (verifies signatures, ct_hash, lane, AEAD)
-            let op_id = op.compute_op_id()?;
-            vault.ingest_verified_op(&op, op_id)?;
+        let mut ops_pulled = 0;
+        if head.tree_size > fetch_threshold {
+            let fetch_resp = transport.fetch_ops(&account_id, after_idx, 1000)?;
+            ops_pulled = fetch_resp.ops.len();
+
+            if stored_size == 0 && local_size == 0 && head.tree_size > 0 {
+                let mut initial_tree = tn_merkle::MerkleTree::new();
+                for (op, _) in &fetch_resp.ops {
+                    let op_id = op.compute_op_id()?;
+                    initial_tree.append_leaf_hash(*op_id.as_bytes());
+                }
+                if initial_tree.root().as_bytes() != &head.root_hash {
+                    return Err(TnError::RootMismatch);
+                }
+            }
+
+            for (op, _) in fetch_resp.ops {
+                let op_id = op.compute_op_id()?;
+                vault.ingest_verified_op(&op, op_id)?;
+            }
         }
+
+        // Persist newly verified canonical tree size and root
+        vault
+            .storage()
+            .set_metadata("last_verified_tree_size", &head.tree_size.to_le_bytes())?;
+        vault
+            .storage()
+            .set_metadata("last_verified_account_root", &head.root_hash)?;
 
         let final_report = vault.verify_local()?;
 
