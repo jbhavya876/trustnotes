@@ -1,0 +1,1620 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:151dd0f3-4198-4919-8f0b-a7d254a3e00c",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-01T20:55:12.293158+00:00",
+    "tools": [
+      {
+        "vendor": "TrustNotes",
+        "name": "tn-release-sbom",
+        "version": "0.1.0"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "name": "trustnotes",
+      "version": "0.1.0-rc1",
+      "description": "End-to-End Encrypted, Transparency-Log-Backed Notebook",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/aead@0.5.2",
+      "name": "aead",
+      "version": "0.5.2",
+      "purl": "pkg:cargo/aead@0.5.2",
+      "description": "Rust crate aead from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/ahash@0.8.12",
+      "name": "ahash",
+      "version": "0.8.12",
+      "purl": "pkg:cargo/ahash@0.8.12",
+      "description": "Rust crate ahash from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/aho-corasick@1.1.5",
+      "name": "aho-corasick",
+      "version": "1.1.5",
+      "purl": "pkg:cargo/aho-corasick@1.1.5",
+      "description": "Rust crate aho-corasick from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/anstream@1.0.0",
+      "name": "anstream",
+      "version": "1.0.0",
+      "purl": "pkg:cargo/anstream@1.0.0",
+      "description": "Rust crate anstream from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/anstyle@1.0.14",
+      "name": "anstyle",
+      "version": "1.0.14",
+      "purl": "pkg:cargo/anstyle@1.0.14",
+      "description": "Rust crate anstyle from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/anstyle-parse@1.0.0",
+      "name": "anstyle-parse",
+      "version": "1.0.0",
+      "purl": "pkg:cargo/anstyle-parse@1.0.0",
+      "description": "Rust crate anstyle-parse from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/anstyle-query@1.1.5",
+      "name": "anstyle-query",
+      "version": "1.1.5",
+      "purl": "pkg:cargo/anstyle-query@1.1.5",
+      "description": "Rust crate anstyle-query from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/anstyle-wincon@3.0.11",
+      "name": "anstyle-wincon",
+      "version": "3.0.11",
+      "purl": "pkg:cargo/anstyle-wincon@3.0.11",
+      "description": "Rust crate anstyle-wincon from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/anyhow@1.0.104",
+      "name": "anyhow",
+      "version": "1.0.104",
+      "purl": "pkg:cargo/anyhow@1.0.104",
+      "description": "Rust crate anyhow from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/argon2@0.5.3",
+      "name": "argon2",
+      "version": "0.5.3",
+      "purl": "pkg:cargo/argon2@0.5.3",
+      "description": "Rust crate argon2 from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/assert_cmd@2.2.2",
+      "name": "assert_cmd",
+      "version": "2.2.2",
+      "purl": "pkg:cargo/assert_cmd@2.2.2",
+      "description": "Rust crate assert_cmd from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/autocfg@1.5.1",
+      "name": "autocfg",
+      "version": "1.5.1",
+      "purl": "pkg:cargo/autocfg@1.5.1",
+      "description": "Rust crate autocfg from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/base64@0.22.1",
+      "name": "base64",
+      "version": "0.22.1",
+      "purl": "pkg:cargo/base64@0.22.1",
+      "description": "Rust crate base64 from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/base64ct@1.8.3",
+      "name": "base64ct",
+      "version": "1.8.3",
+      "purl": "pkg:cargo/base64ct@1.8.3",
+      "description": "Rust crate base64ct from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/bit-set@0.11.1",
+      "name": "bit-set",
+      "version": "0.11.1",
+      "purl": "pkg:cargo/bit-set@0.11.1",
+      "description": "Rust crate bit-set from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/bit-vec@0.10.1",
+      "name": "bit-vec",
+      "version": "0.10.1",
+      "purl": "pkg:cargo/bit-vec@0.10.1",
+      "description": "Rust crate bit-vec from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/bitflags@2.13.2",
+      "name": "bitflags",
+      "version": "2.13.2",
+      "purl": "pkg:cargo/bitflags@2.13.2",
+      "description": "Rust crate bitflags from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/blake2@0.10.6",
+      "name": "blake2",
+      "version": "0.10.6",
+      "purl": "pkg:cargo/blake2@0.10.6",
+      "description": "Rust crate blake2 from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/block-buffer@0.10.4",
+      "name": "block-buffer",
+      "version": "0.10.4",
+      "purl": "pkg:cargo/block-buffer@0.10.4",
+      "description": "Rust crate block-buffer from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/borsh@1.8.1",
+      "name": "borsh",
+      "version": "1.8.1",
+      "purl": "pkg:cargo/borsh@1.8.1",
+      "description": "Rust crate borsh from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/borsh-derive@1.8.1",
+      "name": "borsh-derive",
+      "version": "1.8.1",
+      "purl": "pkg:cargo/borsh-derive@1.8.1",
+      "description": "Rust crate borsh-derive from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/bstr@1.13.1",
+      "name": "bstr",
+      "version": "1.13.1",
+      "purl": "pkg:cargo/bstr@1.13.1",
+      "description": "Rust crate bstr from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/bytes@1.12.1",
+      "name": "bytes",
+      "version": "1.12.1",
+      "purl": "pkg:cargo/bytes@1.12.1",
+      "description": "Rust crate bytes from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/cc@1.10.0",
+      "name": "cc",
+      "version": "1.10.0",
+      "purl": "pkg:cargo/cc@1.10.0",
+      "description": "Rust crate cc from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/cfg-if@1.0.5",
+      "name": "cfg-if",
+      "version": "1.0.5",
+      "purl": "pkg:cargo/cfg-if@1.0.5",
+      "description": "Rust crate cfg-if from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/cfg_aliases@0.2.2",
+      "name": "cfg_aliases",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cfg_aliases@0.2.2",
+      "description": "Rust crate cfg_aliases from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/chacha20@0.9.1",
+      "name": "chacha20",
+      "version": "0.9.1",
+      "purl": "pkg:cargo/chacha20@0.9.1",
+      "description": "Rust crate chacha20 from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/chacha20@0.10.2",
+      "name": "chacha20",
+      "version": "0.10.2",
+      "purl": "pkg:cargo/chacha20@0.10.2",
+      "description": "Rust crate chacha20 from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/chacha20poly1305@0.10.1",
+      "name": "chacha20poly1305",
+      "version": "0.10.1",
+      "purl": "pkg:cargo/chacha20poly1305@0.10.1",
+      "description": "Rust crate chacha20poly1305 from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/ciborium@0.2.2",
+      "name": "ciborium",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/ciborium@0.2.2",
+      "description": "Rust crate ciborium from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/ciborium-io@0.2.2",
+      "name": "ciborium-io",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/ciborium-io@0.2.2",
+      "description": "Rust crate ciborium-io from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/ciborium-ll@0.2.2",
+      "name": "ciborium-ll",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/ciborium-ll@0.2.2",
+      "description": "Rust crate ciborium-ll from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/cipher@0.4.4",
+      "name": "cipher",
+      "version": "0.4.4",
+      "purl": "pkg:cargo/cipher@0.4.4",
+      "description": "Rust crate cipher from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/clap@4.6.7",
+      "name": "clap",
+      "version": "4.6.7",
+      "purl": "pkg:cargo/clap@4.6.7",
+      "description": "Rust crate clap from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/clap_builder@4.6.7",
+      "name": "clap_builder",
+      "version": "4.6.7",
+      "purl": "pkg:cargo/clap_builder@4.6.7",
+      "description": "Rust crate clap_builder from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/clap_derive@4.6.7",
+      "name": "clap_derive",
+      "version": "4.6.7",
+      "purl": "pkg:cargo/clap_derive@4.6.7",
+      "description": "Rust crate clap_derive from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/clap_lex@1.1.1",
+      "name": "clap_lex",
+      "version": "1.1.1",
+      "purl": "pkg:cargo/clap_lex@1.1.1",
+      "description": "Rust crate clap_lex from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/cmov@0.5.4",
+      "name": "cmov",
+      "version": "0.5.4",
+      "purl": "pkg:cargo/cmov@0.5.4",
+      "description": "Rust crate cmov from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/colorchoice@1.0.5",
+      "name": "colorchoice",
+      "version": "1.0.5",
+      "purl": "pkg:cargo/colorchoice@1.0.5",
+      "description": "Rust crate colorchoice from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/const-oid@0.10.2",
+      "name": "const-oid",
+      "version": "0.10.2",
+      "purl": "pkg:cargo/const-oid@0.10.2",
+      "description": "Rust crate const-oid from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/core_detect@1.0.0",
+      "name": "core_detect",
+      "version": "1.0.0",
+      "purl": "pkg:cargo/core_detect@1.0.0",
+      "description": "Rust crate core_detect from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/cpufeatures@0.2.17",
+      "name": "cpufeatures",
+      "version": "0.2.17",
+      "purl": "pkg:cargo/cpufeatures@0.2.17",
+      "description": "Rust crate cpufeatures from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/cpufeatures@0.3.1",
+      "name": "cpufeatures",
+      "version": "0.3.1",
+      "purl": "pkg:cargo/cpufeatures@0.3.1",
+      "description": "Rust crate cpufeatures from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/crunchy@0.2.4",
+      "name": "crunchy",
+      "version": "0.2.4",
+      "purl": "pkg:cargo/crunchy@0.2.4",
+      "description": "Rust crate crunchy from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/crypto-common@0.1.7",
+      "name": "crypto-common",
+      "version": "0.1.7",
+      "purl": "pkg:cargo/crypto-common@0.1.7",
+      "description": "Rust crate crypto-common from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/crypto-common@0.2.2",
+      "name": "crypto-common",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/crypto-common@0.2.2",
+      "description": "Rust crate crypto-common from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/ctutils@0.4.7",
+      "name": "ctutils",
+      "version": "0.4.7",
+      "purl": "pkg:cargo/ctutils@0.4.7",
+      "description": "Rust crate ctutils from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/curve25519-dalek@4.1.3",
+      "name": "curve25519-dalek",
+      "version": "4.1.3",
+      "purl": "pkg:cargo/curve25519-dalek@4.1.3",
+      "description": "Rust crate curve25519-dalek from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/curve25519-dalek@5.0.0",
+      "name": "curve25519-dalek",
+      "version": "5.0.0",
+      "purl": "pkg:cargo/curve25519-dalek@5.0.0",
+      "description": "Rust crate curve25519-dalek from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/curve25519-dalek-derive@0.1.1",
+      "name": "curve25519-dalek-derive",
+      "version": "0.1.1",
+      "purl": "pkg:cargo/curve25519-dalek-derive@0.1.1",
+      "description": "Rust crate curve25519-dalek-derive from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/der@0.8.3",
+      "name": "der",
+      "version": "0.8.3",
+      "purl": "pkg:cargo/der@0.8.3",
+      "description": "Rust crate der from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/difflib@0.4.0",
+      "name": "difflib",
+      "version": "0.4.0",
+      "purl": "pkg:cargo/difflib@0.4.0",
+      "description": "Rust crate difflib from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/digest@0.10.7",
+      "name": "digest",
+      "version": "0.10.7",
+      "purl": "pkg:cargo/digest@0.10.7",
+      "description": "Rust crate digest from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/digest@0.11.3",
+      "name": "digest",
+      "version": "0.11.3",
+      "purl": "pkg:cargo/digest@0.11.3",
+      "description": "Rust crate digest from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/ed25519@2.2.3",
+      "name": "ed25519",
+      "version": "2.2.3",
+      "purl": "pkg:cargo/ed25519@2.2.3",
+      "description": "Rust crate ed25519 from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/ed25519-dalek@2.2.0",
+      "name": "ed25519-dalek",
+      "version": "2.2.0",
+      "purl": "pkg:cargo/ed25519-dalek@2.2.0",
+      "description": "Rust crate ed25519-dalek from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/equivalent@1.0.3",
+      "name": "equivalent",
+      "version": "1.0.3",
+      "purl": "pkg:cargo/equivalent@1.0.3",
+      "description": "Rust crate equivalent from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/errno@0.3.14",
+      "name": "errno",
+      "version": "0.3.14",
+      "purl": "pkg:cargo/errno@0.3.14",
+      "description": "Rust crate errno from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/fallible-iterator@0.3.0",
+      "name": "fallible-iterator",
+      "version": "0.3.0",
+      "purl": "pkg:cargo/fallible-iterator@0.3.0",
+      "description": "Rust crate fallible-iterator from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/fallible-streaming-iterator@0.1.9",
+      "name": "fallible-streaming-iterator",
+      "version": "0.1.9",
+      "purl": "pkg:cargo/fallible-streaming-iterator@0.1.9",
+      "description": "Rust crate fallible-streaming-iterator from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/fastrand@2.5.0",
+      "name": "fastrand",
+      "version": "2.5.0",
+      "purl": "pkg:cargo/fastrand@2.5.0",
+      "description": "Rust crate fastrand from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/fiat-crypto@0.2.9",
+      "name": "fiat-crypto",
+      "version": "0.2.9",
+      "purl": "pkg:cargo/fiat-crypto@0.2.9",
+      "description": "Rust crate fiat-crypto from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/fiat-crypto@0.3.0",
+      "name": "fiat-crypto",
+      "version": "0.3.0",
+      "purl": "pkg:cargo/fiat-crypto@0.3.0",
+      "description": "Rust crate fiat-crypto from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/find-msvc-tools@0.1.15",
+      "name": "find-msvc-tools",
+      "version": "0.1.15",
+      "purl": "pkg:cargo/find-msvc-tools@0.1.15",
+      "description": "Rust crate find-msvc-tools from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/float-cmp@0.10.0",
+      "name": "float-cmp",
+      "version": "0.10.0",
+      "purl": "pkg:cargo/float-cmp@0.10.0",
+      "description": "Rust crate float-cmp from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/fnv@1.0.7",
+      "name": "fnv",
+      "version": "1.0.7",
+      "purl": "pkg:cargo/fnv@1.0.7",
+      "description": "Rust crate fnv from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/generic-array@0.14.7",
+      "name": "generic-array",
+      "version": "0.14.7",
+      "purl": "pkg:cargo/generic-array@0.14.7",
+      "description": "Rust crate generic-array from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/getrandom@0.2.17",
+      "name": "getrandom",
+      "version": "0.2.17",
+      "purl": "pkg:cargo/getrandom@0.2.17",
+      "description": "Rust crate getrandom from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/getrandom@0.4.3",
+      "name": "getrandom",
+      "version": "0.4.3",
+      "purl": "pkg:cargo/getrandom@0.4.3",
+      "description": "Rust crate getrandom from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/half@2.7.1",
+      "name": "half",
+      "version": "2.7.1",
+      "purl": "pkg:cargo/half@2.7.1",
+      "description": "Rust crate half from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/hashbrown@0.14.5",
+      "name": "hashbrown",
+      "version": "0.14.5",
+      "purl": "pkg:cargo/hashbrown@0.14.5",
+      "description": "Rust crate hashbrown from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/hashbrown@0.17.1",
+      "name": "hashbrown",
+      "version": "0.17.1",
+      "purl": "pkg:cargo/hashbrown@0.17.1",
+      "description": "Rust crate hashbrown from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/hashlink@0.9.1",
+      "name": "hashlink",
+      "version": "0.9.1",
+      "purl": "pkg:cargo/hashlink@0.9.1",
+      "description": "Rust crate hashlink from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/heck@0.5.0",
+      "name": "heck",
+      "version": "0.5.0",
+      "purl": "pkg:cargo/heck@0.5.0",
+      "description": "Rust crate heck from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/hex@0.4.3",
+      "name": "hex",
+      "version": "0.4.3",
+      "purl": "pkg:cargo/hex@0.4.3",
+      "description": "Rust crate hex from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/hkdf@0.12.4",
+      "name": "hkdf",
+      "version": "0.12.4",
+      "purl": "pkg:cargo/hkdf@0.12.4",
+      "description": "Rust crate hkdf from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/hmac@0.12.1",
+      "name": "hmac",
+      "version": "0.12.1",
+      "purl": "pkg:cargo/hmac@0.12.1",
+      "description": "Rust crate hmac from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/hybrid-array@0.4.15",
+      "name": "hybrid-array",
+      "version": "0.4.15",
+      "purl": "pkg:cargo/hybrid-array@0.4.15",
+      "description": "Rust crate hybrid-array from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/indexmap@2.14.2",
+      "name": "indexmap",
+      "version": "2.14.2",
+      "purl": "pkg:cargo/indexmap@2.14.2",
+      "description": "Rust crate indexmap from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/inout@0.1.4",
+      "name": "inout",
+      "version": "0.1.4",
+      "purl": "pkg:cargo/inout@0.1.4",
+      "description": "Rust crate inout from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/is_terminal_polyfill@1.70.2",
+      "name": "is_terminal_polyfill",
+      "version": "1.70.2",
+      "purl": "pkg:cargo/is_terminal_polyfill@1.70.2",
+      "description": "Rust crate is_terminal_polyfill from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/itoa@1.0.18",
+      "name": "itoa",
+      "version": "1.0.18",
+      "purl": "pkg:cargo/itoa@1.0.18",
+      "description": "Rust crate itoa from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/keccak@0.2.2",
+      "name": "keccak",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/keccak@0.2.2",
+      "description": "Rust crate keccak from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/kem@0.3.0",
+      "name": "kem",
+      "version": "0.3.0",
+      "purl": "pkg:cargo/kem@0.3.0",
+      "description": "Rust crate kem from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/libc@0.2.191",
+      "name": "libc",
+      "version": "0.2.191",
+      "purl": "pkg:cargo/libc@0.2.191",
+      "description": "Rust crate libc from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/libsqlite3-sys@0.30.1",
+      "name": "libsqlite3-sys",
+      "version": "0.30.1",
+      "purl": "pkg:cargo/libsqlite3-sys@0.30.1",
+      "description": "Rust crate libsqlite3-sys from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/linux-raw-sys@0.12.1",
+      "name": "linux-raw-sys",
+      "version": "0.12.1",
+      "purl": "pkg:cargo/linux-raw-sys@0.12.1",
+      "description": "Rust crate linux-raw-sys from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/memchr@2.8.3",
+      "name": "memchr",
+      "version": "2.8.3",
+      "purl": "pkg:cargo/memchr@2.8.3",
+      "description": "Rust crate memchr from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/ml-dsa@0.1.1",
+      "name": "ml-dsa",
+      "version": "0.1.1",
+      "purl": "pkg:cargo/ml-dsa@0.1.1",
+      "description": "Rust crate ml-dsa from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/ml-kem@0.3.4",
+      "name": "ml-kem",
+      "version": "0.3.4",
+      "purl": "pkg:cargo/ml-kem@0.3.4",
+      "description": "Rust crate ml-kem from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/module-lattice@0.2.4",
+      "name": "module-lattice",
+      "version": "0.2.4",
+      "purl": "pkg:cargo/module-lattice@0.2.4",
+      "description": "Rust crate module-lattice from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/normalize-line-endings@0.3.0",
+      "name": "normalize-line-endings",
+      "version": "0.3.0",
+      "purl": "pkg:cargo/normalize-line-endings@0.3.0",
+      "description": "Rust crate normalize-line-endings from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/num-traits@0.2.19",
+      "name": "num-traits",
+      "version": "0.2.19",
+      "purl": "pkg:cargo/num-traits@0.2.19",
+      "description": "Rust crate num-traits from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/once_cell@1.21.4",
+      "name": "once_cell",
+      "version": "1.21.4",
+      "purl": "pkg:cargo/once_cell@1.21.4",
+      "description": "Rust crate once_cell from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/once_cell_polyfill@1.70.2",
+      "name": "once_cell_polyfill",
+      "version": "1.70.2",
+      "purl": "pkg:cargo/once_cell_polyfill@1.70.2",
+      "description": "Rust crate once_cell_polyfill from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/opaque-debug@0.3.1",
+      "name": "opaque-debug",
+      "version": "0.3.1",
+      "purl": "pkg:cargo/opaque-debug@0.3.1",
+      "description": "Rust crate opaque-debug from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/password-hash@0.5.0",
+      "name": "password-hash",
+      "version": "0.5.0",
+      "purl": "pkg:cargo/password-hash@0.5.0",
+      "description": "Rust crate password-hash from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/pkcs8@0.11.0",
+      "name": "pkcs8",
+      "version": "0.11.0",
+      "purl": "pkg:cargo/pkcs8@0.11.0",
+      "description": "Rust crate pkcs8 from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/pkg-config@0.3.34",
+      "name": "pkg-config",
+      "version": "0.3.34",
+      "purl": "pkg:cargo/pkg-config@0.3.34",
+      "description": "Rust crate pkg-config from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/poly1305@0.8.0",
+      "name": "poly1305",
+      "version": "0.8.0",
+      "purl": "pkg:cargo/poly1305@0.8.0",
+      "description": "Rust crate poly1305 from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/predicates@3.1.4",
+      "name": "predicates",
+      "version": "3.1.4",
+      "purl": "pkg:cargo/predicates@3.1.4",
+      "description": "Rust crate predicates from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/predicates-core@1.0.10",
+      "name": "predicates-core",
+      "version": "1.0.10",
+      "purl": "pkg:cargo/predicates-core@1.0.10",
+      "description": "Rust crate predicates-core from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/predicates-tree@1.0.13",
+      "name": "predicates-tree",
+      "version": "1.0.13",
+      "purl": "pkg:cargo/predicates-tree@1.0.13",
+      "description": "Rust crate predicates-tree from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/proc-macro-crate@3.5.0",
+      "name": "proc-macro-crate",
+      "version": "3.5.0",
+      "purl": "pkg:cargo/proc-macro-crate@3.5.0",
+      "description": "Rust crate proc-macro-crate from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/proc-macro2@1.0.107",
+      "name": "proc-macro2",
+      "version": "1.0.107",
+      "purl": "pkg:cargo/proc-macro2@1.0.107",
+      "description": "Rust crate proc-macro2 from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/proptest@1.12.0",
+      "name": "proptest",
+      "version": "1.12.0",
+      "purl": "pkg:cargo/proptest@1.12.0",
+      "description": "Rust crate proptest from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/quick-error@1.2.3",
+      "name": "quick-error",
+      "version": "1.2.3",
+      "purl": "pkg:cargo/quick-error@1.2.3",
+      "description": "Rust crate quick-error from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/quote@1.0.47",
+      "name": "quote",
+      "version": "1.0.47",
+      "purl": "pkg:cargo/quote@1.0.47",
+      "description": "Rust crate quote from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/r-efi@6.0.0",
+      "name": "r-efi",
+      "version": "6.0.0",
+      "purl": "pkg:cargo/r-efi@6.0.0",
+      "description": "Rust crate r-efi from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/rand@0.10.3",
+      "name": "rand",
+      "version": "0.10.3",
+      "purl": "pkg:cargo/rand@0.10.3",
+      "description": "Rust crate rand from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/rand_core@0.6.4",
+      "name": "rand_core",
+      "version": "0.6.4",
+      "purl": "pkg:cargo/rand_core@0.6.4",
+      "description": "Rust crate rand_core from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/rand_core@0.10.1",
+      "name": "rand_core",
+      "version": "0.10.1",
+      "purl": "pkg:cargo/rand_core@0.10.1",
+      "description": "Rust crate rand_core from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/rand_xorshift@0.5.0",
+      "name": "rand_xorshift",
+      "version": "0.5.0",
+      "purl": "pkg:cargo/rand_xorshift@0.5.0",
+      "description": "Rust crate rand_xorshift from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/regex@1.13.1",
+      "name": "regex",
+      "version": "1.13.1",
+      "purl": "pkg:cargo/regex@1.13.1",
+      "description": "Rust crate regex from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/regex-automata@0.4.18",
+      "name": "regex-automata",
+      "version": "0.4.18",
+      "purl": "pkg:cargo/regex-automata@0.4.18",
+      "description": "Rust crate regex-automata from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/regex-syntax@0.8.11",
+      "name": "regex-syntax",
+      "version": "0.8.11",
+      "purl": "pkg:cargo/regex-syntax@0.8.11",
+      "description": "Rust crate regex-syntax from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/rusqlite@0.32.1",
+      "name": "rusqlite",
+      "version": "0.32.1",
+      "purl": "pkg:cargo/rusqlite@0.32.1",
+      "description": "Rust crate rusqlite from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/rustc_version@0.4.1",
+      "name": "rustc_version",
+      "version": "0.4.1",
+      "purl": "pkg:cargo/rustc_version@0.4.1",
+      "description": "Rust crate rustc_version from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/rustix@1.1.6",
+      "name": "rustix",
+      "version": "1.1.6",
+      "purl": "pkg:cargo/rustix@1.1.6",
+      "description": "Rust crate rustix from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/rusty-fork@0.3.1",
+      "name": "rusty-fork",
+      "version": "0.3.1",
+      "purl": "pkg:cargo/rusty-fork@0.3.1",
+      "description": "Rust crate rusty-fork from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/semver@1.0.28",
+      "name": "semver",
+      "version": "1.0.28",
+      "purl": "pkg:cargo/semver@1.0.28",
+      "description": "Rust crate semver from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/serde@1.0.229",
+      "name": "serde",
+      "version": "1.0.229",
+      "purl": "pkg:cargo/serde@1.0.229",
+      "description": "Rust crate serde from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/serde_core@1.0.229",
+      "name": "serde_core",
+      "version": "1.0.229",
+      "purl": "pkg:cargo/serde_core@1.0.229",
+      "description": "Rust crate serde_core from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/serde_derive@1.0.229",
+      "name": "serde_derive",
+      "version": "1.0.229",
+      "purl": "pkg:cargo/serde_derive@1.0.229",
+      "description": "Rust crate serde_derive from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/serde_json@1.0.154",
+      "name": "serde_json",
+      "version": "1.0.154",
+      "purl": "pkg:cargo/serde_json@1.0.154",
+      "description": "Rust crate serde_json from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/sha2@0.10.9",
+      "name": "sha2",
+      "version": "0.10.9",
+      "purl": "pkg:cargo/sha2@0.10.9",
+      "description": "Rust crate sha2 from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/sha3@0.12.0",
+      "name": "sha3",
+      "version": "0.12.0",
+      "purl": "pkg:cargo/sha3@0.12.0",
+      "description": "Rust crate sha3 from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/shake@0.1.0",
+      "name": "shake",
+      "version": "0.1.0",
+      "purl": "pkg:cargo/shake@0.1.0",
+      "description": "Rust crate shake from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/shlex@2.0.1",
+      "name": "shlex",
+      "version": "2.0.1",
+      "purl": "pkg:cargo/shlex@2.0.1",
+      "description": "Rust crate shlex from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/signature@2.2.0",
+      "name": "signature",
+      "version": "2.2.0",
+      "purl": "pkg:cargo/signature@2.2.0",
+      "description": "Rust crate signature from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/signature@3.0.0",
+      "name": "signature",
+      "version": "3.0.0",
+      "purl": "pkg:cargo/signature@3.0.0",
+      "description": "Rust crate signature from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/smallvec@1.16.4",
+      "name": "smallvec",
+      "version": "1.16.4",
+      "purl": "pkg:cargo/smallvec@1.16.4",
+      "description": "Rust crate smallvec from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/spki@0.8.1",
+      "name": "spki",
+      "version": "0.8.1",
+      "purl": "pkg:cargo/spki@0.8.1",
+      "description": "Rust crate spki from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/sponge-cursor@0.1.0",
+      "name": "sponge-cursor",
+      "version": "0.1.0",
+      "purl": "pkg:cargo/sponge-cursor@0.1.0",
+      "description": "Rust crate sponge-cursor from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/strsim@0.11.1",
+      "name": "strsim",
+      "version": "0.11.1",
+      "purl": "pkg:cargo/strsim@0.11.1",
+      "description": "Rust crate strsim from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/subtle@2.6.1",
+      "name": "subtle",
+      "version": "2.6.1",
+      "purl": "pkg:cargo/subtle@2.6.1",
+      "description": "Rust crate subtle from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/syn@2.0.119",
+      "name": "syn",
+      "version": "2.0.119",
+      "purl": "pkg:cargo/syn@2.0.119",
+      "description": "Rust crate syn from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/syn@3.0.9",
+      "name": "syn",
+      "version": "3.0.9",
+      "purl": "pkg:cargo/syn@3.0.9",
+      "description": "Rust crate syn from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/tempfile@3.27.0",
+      "name": "tempfile",
+      "version": "3.27.0",
+      "purl": "pkg:cargo/tempfile@3.27.0",
+      "description": "Rust crate tempfile from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/termtree@0.5.1",
+      "name": "termtree",
+      "version": "0.5.1",
+      "purl": "pkg:cargo/termtree@0.5.1",
+      "description": "Rust crate termtree from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/thiserror@2.0.21",
+      "name": "thiserror",
+      "version": "2.0.21",
+      "purl": "pkg:cargo/thiserror@2.0.21",
+      "description": "Rust crate thiserror from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/thiserror-impl@2.0.21",
+      "name": "thiserror-impl",
+      "version": "2.0.21",
+      "purl": "pkg:cargo/thiserror-impl@2.0.21",
+      "description": "Rust crate thiserror-impl from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/tn-adversary@0.1.0",
+      "name": "tn-adversary",
+      "version": "0.1.0",
+      "purl": "pkg:cargo/tn-adversary@0.1.0",
+      "description": "TrustNotes internal workspace crate: tn-adversary",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:cargo/tn-cli@0.1.0",
+      "name": "tn-cli",
+      "version": "0.1.0",
+      "purl": "pkg:cargo/tn-cli@0.1.0",
+      "description": "TrustNotes internal workspace crate: tn-cli",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/tn-core@0.1.0",
+      "name": "tn-core",
+      "version": "0.1.0",
+      "purl": "pkg:cargo/tn-core@0.1.0",
+      "description": "TrustNotes internal workspace crate: tn-core",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/tn-crypto@0.1.0",
+      "name": "tn-crypto",
+      "version": "0.1.0",
+      "purl": "pkg:cargo/tn-crypto@0.1.0",
+      "description": "TrustNotes internal workspace crate: tn-crypto",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:cargo/tn-desktop@0.1.0",
+      "name": "tn-desktop",
+      "version": "0.1.0",
+      "purl": "pkg:cargo/tn-desktop@0.1.0",
+      "description": "TrustNotes internal workspace crate: tn-desktop",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/tn-merkle@0.1.0",
+      "name": "tn-merkle",
+      "version": "0.1.0",
+      "purl": "pkg:cargo/tn-merkle@0.1.0",
+      "description": "TrustNotes internal workspace crate: tn-merkle",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/tn-monitor@0.1.0",
+      "name": "tn-monitor",
+      "version": "0.1.0",
+      "purl": "pkg:cargo/tn-monitor@0.1.0",
+      "description": "TrustNotes internal workspace crate: tn-monitor",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/tn-oplog@0.1.0",
+      "name": "tn-oplog",
+      "version": "0.1.0",
+      "purl": "pkg:cargo/tn-oplog@0.1.0",
+      "description": "TrustNotes internal workspace crate: tn-oplog",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/tn-proto@0.1.0",
+      "name": "tn-proto",
+      "version": "0.1.0",
+      "purl": "pkg:cargo/tn-proto@0.1.0",
+      "description": "TrustNotes internal workspace crate: tn-proto",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:cargo/tn-release@0.1.0",
+      "name": "tn-release",
+      "version": "0.1.0",
+      "purl": "pkg:cargo/tn-release@0.1.0",
+      "description": "TrustNotes internal workspace crate: tn-release",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/tn-server@0.1.0",
+      "name": "tn-server",
+      "version": "0.1.0",
+      "purl": "pkg:cargo/tn-server@0.1.0",
+      "description": "TrustNotes internal workspace crate: tn-server",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/tn-tlog@0.1.0",
+      "name": "tn-tlog",
+      "version": "0.1.0",
+      "purl": "pkg:cargo/tn-tlog@0.1.0",
+      "description": "TrustNotes internal workspace crate: tn-tlog",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/tn-types@0.1.0",
+      "name": "tn-types",
+      "version": "0.1.0",
+      "purl": "pkg:cargo/tn-types@0.1.0",
+      "description": "TrustNotes internal workspace crate: tn-types",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/tn-witness@0.1.0",
+      "name": "tn-witness",
+      "version": "0.1.0",
+      "purl": "pkg:cargo/tn-witness@0.1.0",
+      "description": "TrustNotes internal workspace crate: tn-witness",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/toml_datetime@1.1.2+spec-1.1.0",
+      "name": "toml_datetime",
+      "version": "1.1.2+spec-1.1.0",
+      "purl": "pkg:cargo/toml_datetime@1.1.2+spec-1.1.0",
+      "description": "Rust crate toml_datetime from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/toml_edit@0.25.17+spec-1.1.0",
+      "name": "toml_edit",
+      "version": "0.25.17+spec-1.1.0",
+      "purl": "pkg:cargo/toml_edit@0.25.17+spec-1.1.0",
+      "description": "Rust crate toml_edit from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/toml_parser@1.1.5+spec-1.1.0",
+      "name": "toml_parser",
+      "version": "1.1.5+spec-1.1.0",
+      "purl": "pkg:cargo/toml_parser@1.1.5+spec-1.1.0",
+      "description": "Rust crate toml_parser from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/typenum@1.20.1",
+      "name": "typenum",
+      "version": "1.20.1",
+      "purl": "pkg:cargo/typenum@1.20.1",
+      "description": "Rust crate typenum from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/unarray@0.1.4",
+      "name": "unarray",
+      "version": "0.1.4",
+      "purl": "pkg:cargo/unarray@0.1.4",
+      "description": "Rust crate unarray from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/unicode-ident@1.0.27",
+      "name": "unicode-ident",
+      "version": "1.0.27",
+      "purl": "pkg:cargo/unicode-ident@1.0.27",
+      "description": "Rust crate unicode-ident from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/universal-hash@0.5.1",
+      "name": "universal-hash",
+      "version": "0.5.1",
+      "purl": "pkg:cargo/universal-hash@0.5.1",
+      "description": "Rust crate universal-hash from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/utf8parse@0.2.2",
+      "name": "utf8parse",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/utf8parse@0.2.2",
+      "description": "Rust crate utf8parse from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/vcpkg@0.2.15",
+      "name": "vcpkg",
+      "version": "0.2.15",
+      "purl": "pkg:cargo/vcpkg@0.2.15",
+      "description": "Rust crate vcpkg from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/version_check@0.9.5",
+      "name": "version_check",
+      "version": "0.9.5",
+      "purl": "pkg:cargo/version_check@0.9.5",
+      "description": "Rust crate version_check from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/wait-timeout@0.2.1",
+      "name": "wait-timeout",
+      "version": "0.2.1",
+      "purl": "pkg:cargo/wait-timeout@0.2.1",
+      "description": "Rust crate wait-timeout from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/wasi@0.11.1+wasi-snapshot-preview1",
+      "name": "wasi",
+      "version": "0.11.1+wasi-snapshot-preview1",
+      "purl": "pkg:cargo/wasi@0.11.1+wasi-snapshot-preview1",
+      "description": "Rust crate wasi from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/windows-link@0.2.1",
+      "name": "windows-link",
+      "version": "0.2.1",
+      "purl": "pkg:cargo/windows-link@0.2.1",
+      "description": "Rust crate windows-link from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/windows-sys@0.61.2",
+      "name": "windows-sys",
+      "version": "0.61.2",
+      "purl": "pkg:cargo/windows-sys@0.61.2",
+      "description": "Rust crate windows-sys from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/winnow@1.0.4",
+      "name": "winnow",
+      "version": "1.0.4",
+      "purl": "pkg:cargo/winnow@1.0.4",
+      "description": "Rust crate winnow from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/x25519-dalek@3.0.0",
+      "name": "x25519-dalek",
+      "version": "3.0.0",
+      "purl": "pkg:cargo/x25519-dalek@3.0.0",
+      "description": "Rust crate x25519-dalek from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/zerocopy@0.8.63",
+      "name": "zerocopy",
+      "version": "0.8.63",
+      "purl": "pkg:cargo/zerocopy@0.8.63",
+      "description": "Rust crate zerocopy from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/zerocopy-derive@0.8.63",
+      "name": "zerocopy-derive",
+      "version": "0.8.63",
+      "purl": "pkg:cargo/zerocopy-derive@0.8.63",
+      "description": "Rust crate zerocopy-derive from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/zeroize@1.9.1",
+      "name": "zeroize",
+      "version": "1.9.1",
+      "purl": "pkg:cargo/zeroize@1.9.1",
+      "description": "Rust crate zeroize from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/zeroize_derive@1.5.0",
+      "name": "zeroize_derive",
+      "version": "1.5.0",
+      "purl": "pkg:cargo/zeroize_derive@1.5.0",
+      "description": "Rust crate zeroize_derive from crates.io"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/zmij@1.0.23",
+      "name": "zmij",
+      "version": "1.0.23",
+      "purl": "pkg:cargo/zmij@1.0.23",
+      "description": "Rust crate zmij from crates.io"
+    }
+  ]
+}

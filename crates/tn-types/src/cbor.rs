@@ -52,6 +52,9 @@ pub fn decode_canonical<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, TnError>
         .map_err(|e| TnError::Decode(format!("cbor deserialization error: {e}")))
 }
 
+/// Maximum allowed recursion depth for nested CBOR structures.
+pub const MAX_CBOR_DEPTH: usize = 64;
+
 /// Validates that `bytes` adheres to strict canonical CBOR rules.
 /// Returns the number of bytes consumed by the top-level data item.
 ///
@@ -59,10 +62,16 @@ pub fn decode_canonical<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, TnError>
 ///
 /// Returns [`TnError::Decode`] if decoding or strict canonical validation fails.
 pub fn validate_strict_cbor(bytes: &[u8]) -> Result<usize, TnError> {
-    validate_item(bytes, 0)
+    validate_item(bytes, 0, 0)
 }
 
-fn validate_item(bytes: &[u8], offset: usize) -> Result<usize, TnError> {
+fn validate_item(bytes: &[u8], offset: usize, depth: usize) -> Result<usize, TnError> {
+    if depth > MAX_CBOR_DEPTH {
+        return Err(TnError::Decode(
+            "non-canonical CBOR: nesting depth limit exceeded".to_string(),
+        ));
+    }
+
     if offset >= bytes.len() {
         return Err(TnError::Decode("unexpected end of input".to_string()));
     }
@@ -117,8 +126,14 @@ fn validate_item(bytes: &[u8], offset: usize) -> Result<usize, TnError> {
             let count = usize::try_from(arg).map_err(|_| {
                 TnError::Decode("array count exceeds target pointer width".to_string())
             })?;
+            let remaining = bytes.len().saturating_sub(cursor);
+            if count > remaining {
+                return Err(TnError::Decode(format!(
+                    "array count {count} exceeds remaining bytes {remaining}"
+                )));
+            }
             for _ in 0..count {
-                let consumed = validate_item(bytes, cursor)?;
+                let consumed = validate_item(bytes, cursor, depth + 1)?;
                 cursor += consumed;
             }
             Ok(cursor - offset)
@@ -129,17 +144,23 @@ fn validate_item(bytes: &[u8], offset: usize) -> Result<usize, TnError> {
             let count = usize::try_from(arg).map_err(|_| {
                 TnError::Decode("map count exceeds target pointer width".to_string())
             })?;
-            let mut seen_keys: Vec<Vec<u8>> = Vec::with_capacity(count);
+            let remaining = bytes.len().saturating_sub(cursor);
+            if count > remaining / 2 {
+                return Err(TnError::Decode(format!(
+                    "map count {count} exceeds remaining bytes {remaining}"
+                )));
+            }
+            let mut seen_keys: Vec<Vec<u8>> = Vec::with_capacity(count.min(1024));
 
             for _ in 0..count {
                 // Key
                 let key_start = cursor;
-                let key_len = validate_item(bytes, cursor)?;
+                let key_len = validate_item(bytes, cursor, depth + 1)?;
                 let key_bytes = bytes[key_start..key_start + key_len].to_vec();
                 cursor += key_len;
 
                 // Value
-                let val_len = validate_item(bytes, cursor)?;
+                let val_len = validate_item(bytes, cursor, depth + 1)?;
                 cursor += val_len;
 
                 // Check duplicate keys
@@ -155,7 +176,7 @@ fn validate_item(bytes: &[u8], offset: usize) -> Result<usize, TnError> {
 
         // Major 6: Tagged data item
         6 => {
-            let item_len = validate_item(bytes, cursor)?;
+            let item_len = validate_item(bytes, cursor, depth + 1)?;
             cursor += item_len;
             Ok(cursor - offset)
         }

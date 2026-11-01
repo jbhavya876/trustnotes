@@ -1,0 +1,39 @@
+{
+  "crates_reviewed": [
+    {"name": "tn-types", "coverage_pct": 100, "unsafe_count": 0, "status": "clean"},
+    {"name": "tn-crypto", "coverage_pct": 100, "unsafe_count": 0, "status": "clean"},
+    {"name": "tn-oplog", "coverage_pct": 100, "unsafe_count": 0, "status": "clean"},
+    {"name": "tn-merkle", "coverage_pct": 100, "unsafe_count": 0, "status": "clean"},
+    {"name": "tn-tlog", "coverage_pct": 100, "unsafe_count": 0, "status": "clean"},
+    {"name": "tn-proto", "coverage_pct": 100, "unsafe_count": 0, "status": "clean"},
+    {"name": "tn-core", "coverage_pct": 100, "unsafe_count": 0, "status": "clean"},
+    {"name": "tn-server", "coverage_pct": 100, "unsafe_count": 0, "status": "clean"},
+    {"name": "tn-witness", "coverage_pct": 100, "unsafe_count": 0, "status": "clean"},
+    {"name": "tn-monitor", "coverage_pct": 100, "unsafe_count": 0, "status": "clean"},
+    {"name": "tn-desktop", "coverage_pct": 100, "unsafe_count": 0, "status": "clean"},
+    {"name": "tn-cli", "coverage_pct": 100, "unsafe_count": 0, "status": "clean"},
+    {"name": "tn-adversary", "coverage_pct": 100, "unsafe_count": 0, "status": "clean"},
+    {"name": "tn-release", "coverage_pct": 100, "unsafe_count": 0, "status": "clean"}
+  ],
+  "threat_scenarios_covered": [
+    "S1_UNTRUSTED_SERVER_READ",
+    "S2_FORGED_NOTE_OPERATION",
+    "S3_REPLAY_ATTACK",
+    "S4_METADATA_TRAFFIC_ANALYSIS",
+    "S5_QUANTUM_ADVERSARY",
+    "S6_LOG_ROLLBACK",
+    "S7_EQUIVOCATING_SERVER",
+    "S8_COMPROMISED_WITNESS",
+    "S9_SPLIT_VIEW_ATTACK",
+    "S10_LOCAL_CANARY_DISK_LEAK",
+    "S11_TAMPERED_ATTACHMENT_CHUNK",
+    "S12_UNAUTHORIZED_AI_EGRESS",
+    "S13_DESKTOP_XSS_EXFILTRATION",
+    "S14_MALICIOUS_RELEASE_BINARY",
+    "S15_CLOCK_SKEW_MANIPULATION",
+    "S16_IPC_UNAUTHORIZED_CALL"
+  ],
+  "total_automated_tests": 164,
+  "automated_tests_pass_rate": 1.0,
+  "clippy_warnings": 0
+}

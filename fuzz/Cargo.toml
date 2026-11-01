@@ -4,20 +4,40 @@ version = "0.0.0"
 publish = false
 edition = "2021"
 
+[workspace]
+
 [package.metadata]
 cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
 tn-types = { path = "../crates/tn-types" }
-
-# Fuzz targets for M1 (added when implemented):
-# tn-crypto = { path = "../crates/tn-crypto" }
-# tn-oplog = { path = "../crates/tn-oplog" }
-# tn-merkle = { path = "../crates/tn-merkle" }
+tn-crypto = { path = "../crates/tn-crypto" }
+tn-oplog = { path = "../crates/tn-oplog" }
+tn-merkle = { path = "../crates/tn-merkle" }
+tn-tlog = { path = "../crates/tn-tlog" }
+tn-core = { path = "../crates/tn-core" }
 
 [[bin]]
-name = "fuzz_placeholder"
-path = "fuzz_targets/placeholder.rs"
+name = "fuzz_cbor_canonical"
+path = "fuzz_targets/fuzz_cbor_canonical.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_merkle_proofs"
+path = "fuzz_targets/fuzz_merkle_proofs.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_checkpoint_parser"
+path = "fuzz_targets/fuzz_checkpoint_parser.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_attachment_chunks"
+path = "fuzz_targets/fuzz_attachment_chunks.rs"
 test = false
 doc = false

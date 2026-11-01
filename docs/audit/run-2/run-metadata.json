@@ -1,0 +1,30 @@
+{
+  "run_id": "audit-20261102-02",
+  "repo": "trustnotes",
+  "target": "c:\\trustnotes",
+  "source_ref": "m7-hardening-rc",
+  "profile": "comprehensive-rc",
+  "scope_paths": [
+    "crates/",
+    "docs/",
+    "fuzz/",
+    "Cargo.toml",
+    "deny.toml"
+  ],
+  "budget": 30,
+  "execution_policy": "sandboxed-source-and-local-only",
+  "selected_companion_files": [
+    "docs/THREAT_MODEL.md",
+    "docs/CRYPTO.md",
+    "docs/METADATA.md",
+    "docs/SPEC.md",
+    "docs/COMPLIANCE.md"
+  ],
+  "prior_run_paths": [
+    "docs/audit/run-1"
+  ],
+  "shared_file_owners": {
+    "parent": "antigravity"
+  },
+  "run_status": "complete"
+}

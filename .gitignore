@@ -1,4 +1,6 @@
+target/
 /target
+fuzz/target/
 *.lock.bak
 .env
 .env.local
