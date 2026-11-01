@@ -143,6 +143,22 @@ pub fn open_local(
     decrypt_internal(lsk.expose_bytes(), aad, ciphertext)
 }
 
+/// Encrypts raw data with a 32-byte symmetric key.
+///
+/// # Errors
+/// Returns `TnError` on encryption failure.
+pub fn seal_raw(key_bytes: &[u8; 32], aad: &[u8], plaintext: &[u8]) -> Result<Vec<u8>, TnError> {
+    encrypt_internal(key_bytes, aad, plaintext)
+}
+
+/// Decrypts raw data with a 32-byte symmetric key.
+///
+/// # Errors
+/// Returns `TnError::CiphertextTampered` on MAC verification failure.
+pub fn open_raw(key_bytes: &[u8; 32], aad: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, TnError> {
+    decrypt_internal(key_bytes, aad, ciphertext)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

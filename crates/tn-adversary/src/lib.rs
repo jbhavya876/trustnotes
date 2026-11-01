@@ -624,4 +624,160 @@ mod tests {
         let res = auditor.audit_checkpoint(&cp_rogue, None, now_ms);
         assert!(matches!(res, Err(TnError::BadSignature)));
     }
+
+    /// Scenario S16: Cross-user local IPC unauthorized access (Threat S16, Claim C8).
+    ///
+    /// Malicious unprivileged process tries to query the daemon without the 256-bit token.
+    /// Daemon MUST reject without revealing note data or status.
+    #[test]
+    fn adversary_scenario_s16_unauthorized_ipc_access() {
+        use std::sync::atomic::Ordering;
+        use std::time::Duration;
+        use tn_core::{generate_auth_token, DaemonClient, DaemonServer, Vault};
+
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("vault.db");
+        let (vault, _) = Vault::create_new(&db_path, None).unwrap();
+        let token = generate_auth_token().unwrap();
+
+        let (server, listener) = DaemonServer::bind(Some(vault), db_path, token, 0).unwrap();
+        let port = server.port();
+
+        let shutdown = server.shutdown_signal();
+        let handle = std::thread::spawn(move || {
+            let _ = listener.set_nonblocking(true);
+            while !shutdown.load(Ordering::SeqCst) {
+                if let Ok((stream, _)) = listener.accept() {
+                    let _ = server.handle_client(stream);
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        });
+
+        // 1. Rogue client connects with all-zero or forged token
+        let rogue_token = [0x55u8; 32];
+        let rogue_client = DaemonClient::new(port, rogue_token);
+
+        let ping_res = rogue_client.ping();
+        assert!(ping_res.is_err(), "Rogue client ping must be rejected");
+
+        let notes_res = rogue_client.list_notes(false);
+        assert!(
+            notes_res.is_err(),
+            "Rogue client reading notes must be rejected"
+        );
+
+        // 2. Legitimate client connects with true token
+        let legit_client = DaemonClient::new(port, token);
+        assert!(legit_client.ping().is_ok());
+
+        legit_client.stop().unwrap();
+        handle.join().unwrap();
+    }
+
+    /// Scenario S18: Forged or unauthorized key rotation op rejected fail-closed (ADR-0002).
+    ///
+    /// Attacker attempts to submit a KeyRotate op signed by a rogue AIK without authorization
+    /// from the active account key. Server sequencer MUST reject fail-closed with BadSignature.
+    #[test]
+    fn adversary_scenario_s18_forged_key_rotate_op() {
+        use tn_oplog::{compute_ct_hash, compute_op_id, Hlc, Op, OpHeader};
+        use tn_proto::{AccountRegisterReq, KeyRotatePayload, OpSubmitReq};
+        use tn_types::{Id16, OpKind};
+
+        let mut server = Server::in_memory("test.origin".into()).unwrap();
+
+        let legit_user_keys = SigningKeys::generate().unwrap();
+        let legit_vk = legit_user_keys.verifying_keys();
+        let account_id =
+            tn_crypto::derive_account_id(&legit_vk.ed25519_bytes, &legit_vk.mldsa65_bytes);
+
+        // Register legitimate account and enroll initial device
+        let reg_req = AccountRegisterReq {
+            account_id,
+            aik_ed_pub: legit_vk.ed25519_bytes,
+            aik_pq_pub: legit_vk.mldsa65_bytes.clone(),
+            initial_op: None,
+            invite_token: None,
+        };
+        server
+            .register_account(&reg_req, 1_700_000_000_000)
+            .unwrap();
+
+        // Attacker generates rogue replacement keys
+        let attacker_keys = SigningKeys::generate().unwrap();
+        let rogue_new_keys = SigningKeys::generate().unwrap();
+
+        // Attacker creates KeyRotate payload signed by attacker_keys (NOT legit_user_keys)
+        let forged_payload = KeyRotatePayload::create(
+            account_id,
+            &rogue_new_keys,
+            &attacker_keys, // Forged old AIK signature!
+            1_700_000_000_000,
+        )
+        .unwrap();
+        let payload_cbor = forged_payload.to_cbor().unwrap();
+
+        let header = OpHeader {
+            v: 1,
+            account_id,
+            device_id: account_id,
+            lane_seq: 0,
+            lane_prev: None,
+            hlc: Hlc::new(1_700_000_000_000, 0),
+            kind: OpKind::KeyRotate,
+            object_id: Id16::from_bytes([0u8; 16]),
+            nk_wrap: None,
+            nonce: [0u8; 24],
+            deps: vec![],
+            ct_hash: compute_ct_hash(&payload_cbor),
+        };
+        let op_id = compute_op_id(&header).unwrap();
+
+        let mut sig_msg = Vec::new();
+        sig_msg.extend_from_slice(tn_crypto::labels::LABEL_SIG_OP.as_bytes());
+        sig_msg.extend_from_slice(op_id.as_bytes());
+        let sig = legit_user_keys.sign(&sig_msg);
+
+        let forged_op = Op {
+            v: 1,
+            account_id,
+            device_id: account_id,
+            lane_seq: 0,
+            lane_prev: None,
+            hlc: Hlc::new(1_700_000_000_000, 0),
+            kind: OpKind::KeyRotate,
+            object_id: Id16::from_bytes([0u8; 16]),
+            nk_wrap: None,
+            nonce: [0u8; 24],
+            deps: vec![],
+            ct: payload_cbor,
+            sig_ed: sig.ed25519,
+            sig_pq: sig.ml_dsa,
+        };
+
+        let submit_req = OpSubmitReq {
+            ops: vec![forged_op],
+            receipt_requested: true,
+        };
+
+        let req_bytes = tn_types::cbor::encode_canonical(&submit_req).unwrap();
+        let nonce = [1u8; 16];
+        let headers = tn_proto::sign_request(
+            "POST",
+            "/v1/ops",
+            "",
+            &req_bytes,
+            account_id,
+            &legit_user_keys,
+            nonce,
+            1_700_000_000_000,
+            "test.origin",
+        )
+        .unwrap();
+
+        // Server sequencer submission must reject the forged KeyRotate op
+        let res = server.submit_ops(&submit_req, &headers, &legit_vk, 1_700_000_000_000);
+        assert!(matches!(res, Err(TnError::BadSignature)));
+    }
 }

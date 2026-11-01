@@ -2,8 +2,10 @@
 #![warn(clippy::all)]
 //! Vault engine: high-level encrypted note operations and local transparency pipeline.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
+use tn_crypto::kem::{HybridKemPrivateKey, HybridKemPublicKey};
 use tn_crypto::labels::LABEL_SIG_OP;
 use tn_crypto::{
     decode_recovery_key, derive_account_id, derive_account_root, derive_aik_ed_seed,
@@ -15,14 +17,16 @@ use tn_oplog::{
     compute_ct_hash, compute_op_aad, compute_op_id, ConflictStatus, Hlc, LaneRegistry,
     NoteDagTracker, Op, OpHeader, Payload,
 };
-use tn_proto::{DeviceCertificate, DeviceGossip, DeviceRevokePayload};
+use tn_proto::{
+    DeviceCertificate, DeviceGossip, DeviceRevokePayload, EnrollmentPackage, KeyRotatePayload,
+};
 use tn_types::{cbor, Id16, Id32, OpKind, TnError};
 
 use crate::search::SearchIndex;
 use crate::storage::Storage;
 
 /// Brief summary of a note for list displays.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NoteSummary {
     /// Object identifier.
     pub object_id: Id16,
@@ -39,7 +43,7 @@ pub struct NoteSummary {
 }
 
 /// Full details of a note.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NoteDetail {
     /// Summary metadata.
     pub summary: NoteSummary,
@@ -50,7 +54,7 @@ pub struct NoteDetail {
 }
 
 /// Result report from local integrity verification (`verify --local`).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerificationReport {
     /// Total number of operations evaluated.
     pub total_ops: usize,
@@ -67,6 +71,7 @@ pub struct Vault {
     device_id: Id32,
     account_root: AccountRoot,
     vault_key: VaultKey,
+    previous_vault_keys: Vec<VaultKey>,
     signing_keys: SigningKeys,
     lsk: LocalStorageKey,
     lanes: LaneRegistry,
@@ -124,6 +129,7 @@ impl Vault {
             device_id,
             account_root: ar,
             vault_key: vk,
+            previous_vault_keys: Vec::new(),
             signing_keys,
             lsk,
             lanes: LaneRegistry::new(),
@@ -192,12 +198,26 @@ impl Vault {
 
         let signing_keys = SigningKeys::from_seeds(&ed_arr, &pq_arr);
 
+        let mut previous_vault_keys = Vec::new();
+        let mut idx = 0;
+        while let Ok(Some(archived_bytes)) =
+            storage.get_keyring_slot(&format!("vault_key_archived_{idx}"), &lsk)
+        {
+            if archived_bytes.len() == 32 {
+                let mut arr = [0u8; 32];
+                arr.copy_from_slice(&archived_bytes);
+                previous_vault_keys.push(VaultKey::from_bytes(arr));
+            }
+            idx += 1;
+        }
+
         let mut vault = Self {
             storage,
             account_id,
             device_id,
             account_root: ar,
             vault_key: vk,
+            previous_vault_keys,
             signing_keys,
             lsk,
             lanes: LaneRegistry::new(),
@@ -447,6 +467,19 @@ impl Vault {
         Ok(op_id)
     }
 
+    /// Unwraps a wrapped NoteKey attempting current and historical vault keys (ADR-0002).
+    fn unwrap_note_key_any(&self, object_id: Id16, wrapped: &[u8]) -> Result<NoteKey, TnError> {
+        if let Ok(key) = unwrap_note_key(&self.vault_key, object_id, wrapped) {
+            return Ok(key);
+        }
+        for old_vk in &self.previous_vault_keys {
+            if let Ok(key) = unwrap_note_key(old_vk, object_id, wrapped) {
+                return Ok(key);
+            }
+        }
+        unwrap_note_key(&self.vault_key, object_id, wrapped)
+    }
+
     /// Internal helper to retrieve NoteKey, creation time, and current active heads for an object.
     fn get_note_internal(&self, object_id: Id16) -> Result<(NoteKey, u64, Vec<Id32>), TnError> {
         let ops = self.storage.get_ops_for_object(object_id)?;
@@ -461,7 +494,7 @@ impl Vault {
             tracker.add_op(*op_id, op);
             if nk.is_none() {
                 if let Some(wrapped) = &op.nk_wrap {
-                    let key = unwrap_note_key(&self.vault_key, object_id, wrapped)?;
+                    let key = self.unwrap_note_key_any(object_id, wrapped)?;
                     nk = Some(key);
                 }
             }
@@ -783,7 +816,7 @@ impl Vault {
             // 5. If Put with nk_wrap, unwrap NoteKey and verify payload AEAD
             if op.kind == OpKind::Put {
                 if let Some(wrapped) = &op.nk_wrap {
-                    let nk = unwrap_note_key(&self.vault_key, op.object_id, wrapped)?;
+                    let nk = self.unwrap_note_key_any(op.object_id, wrapped)?;
                     note_keys.insert(op.object_id, nk);
                 }
 
@@ -860,6 +893,7 @@ impl Vault {
             device_id,
             account_root: ar,
             vault_key: vk,
+            previous_vault_keys: Vec::new(),
             signing_keys,
             lsk,
             lanes: LaneRegistry::new(),
@@ -977,6 +1011,57 @@ impl Vault {
         Ok((cert, op_id))
     }
 
+    /// Creates an encrypted `EnrollmentPackage` (Claim C8, X-Wing) for a new device.
+    ///
+    /// # Errors
+    /// Returns `TnError` if certificate issuance or KEM encapsulation fails.
+    pub fn create_enrollment_package(
+        &mut self,
+        new_device_vk: &VerifyingKeys,
+        new_device_dtk: &HybridKemPublicKey,
+        expires_at: Option<u64>,
+    ) -> Result<(EnrollmentPackage, Id32), TnError> {
+        let (cert, op_id) =
+            self.enroll_device(new_device_vk, new_device_dtk.to_bytes(), expires_at)?;
+        let now_ms = Hlc::current_physical_ms();
+        let pkg = EnrollmentPackage::seal(
+            self.account_id,
+            *self.account_root.expose_bytes(),
+            cert,
+            new_device_dtk,
+            self.device_id,
+            &self.signing_keys,
+            now_ms,
+        )?;
+        Ok((pkg, op_id))
+    }
+
+    /// Accepts and decrypts an `EnrollmentPackage`, initializing the new device vault.
+    ///
+    /// # Errors
+    /// Returns `TnError` if decapsulation, verification, or DB initialization fails.
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_enrollment_package(
+        db_path: &Path,
+        passphrase: Option<&str>,
+        pkg: &EnrollmentPackage,
+        dtk_priv: &HybridKemPrivateKey,
+        dtk_pub: &HybridKemPublicKey,
+        sender_vk: &VerifyingKeys,
+        new_device_ed_seed: [u8; 32],
+        new_device_pq_seed: [u8; 32],
+    ) -> Result<Self, TnError> {
+        let payload = pkg.open(dtk_priv, dtk_pub, sender_vk)?;
+        Self::from_enrollment(
+            db_path,
+            passphrase,
+            payload.account_root,
+            new_device_ed_seed,
+            new_device_pq_seed,
+            &payload.device_cert,
+        )
+    }
+
     /// Initializes a newly enrolled device vault from an enrollment package.
     ///
     /// # Errors
@@ -1032,6 +1117,7 @@ impl Vault {
             device_id,
             account_root: ar,
             vault_key: vk,
+            previous_vault_keys: Vec::new(),
             signing_keys: device_keys,
             lsk,
             lanes: LaneRegistry::new(),
@@ -1150,7 +1236,7 @@ impl Vault {
         match op.kind {
             OpKind::Put => {
                 let nk = if let Some(wrapped) = &op.nk_wrap {
-                    unwrap_note_key(&self.vault_key, op.object_id, wrapped)?
+                    self.unwrap_note_key_any(op.object_id, wrapped)?
                 } else {
                     let (key, _, _) = self.get_note_internal(op.object_id)?;
                     key
@@ -1320,6 +1406,111 @@ impl Vault {
     pub fn set_last_evidence_bundle(&self, bundle_cbor: &[u8]) -> Result<(), TnError> {
         self.storage
             .set_metadata("last_evidence_bundle", bundle_cbor)
+    }
+
+    /// Rotates the Account Root and identity keys (`OpKind::KeyRotate = 5`, ADR-0002 Mitigation 3).
+    ///
+    /// Generates a fresh 24-word recovery phrase, derives new AR/AIK/VK,
+    /// authors a dual cross-signed transition op, updates local keyring slots,
+    /// and returns the signed `Op`, its `op_id`, and new 24-word recovery phrase.
+    ///
+    /// # Errors
+    /// Returns `TnError` if entropy generation, signing, or storage update fails.
+    pub fn rotate_account_key(&mut self, now_ms: u64) -> Result<(Op, Id32, String), TnError> {
+        let old_aik_ed_seed = derive_aik_ed_seed(&self.account_root);
+        let old_aik_pq_seed = derive_aik_pq_seed(&self.account_root);
+        let old_aik_keys = SigningKeys::from_seeds(&old_aik_ed_seed, &old_aik_pq_seed);
+
+        let mut entropy = [0u8; 32];
+        getrandom::getrandom(&mut entropy)
+            .map_err(|e| TnError::Internal(format!("Entropy generation failed: {e}")))?;
+        let new_rk = RecoveryKey::from_bytes(entropy);
+        let phrase = encode_recovery_key(&new_rk);
+
+        let new_ar = derive_account_root(&new_rk);
+        let new_vk = derive_vault_key(&new_ar);
+
+        let new_aik_ed_seed = derive_aik_ed_seed(&new_ar);
+        let new_aik_pq_seed = derive_aik_pq_seed(&new_ar);
+        let new_aik_keys = SigningKeys::from_seeds(&new_aik_ed_seed, &new_aik_pq_seed);
+
+        let payload =
+            KeyRotatePayload::create(self.account_id, &new_aik_keys, &old_aik_keys, now_ms)?;
+        let payload_cbor = payload.to_cbor()?;
+
+        // Author KeyRotate op
+        let lane_seq = self.lanes.next_seq(&self.device_id);
+        let lane_prev = self.lanes.get_tip(&self.device_id);
+        let hlc = Hlc::now(self.last_hlc.as_ref());
+        self.last_hlc = Some(hlc);
+
+        let object_id = Id16::from_bytes([0u8; 16]);
+        let mut nonce = [0u8; 24];
+        getrandom::getrandom(&mut nonce)
+            .map_err(|e| TnError::Internal(format!("Nonce generation failed: {e}")))?;
+
+        let ct_hash = compute_ct_hash(&payload_cbor);
+
+        let header = OpHeader {
+            v: 1,
+            account_id: self.account_id,
+            device_id: self.device_id,
+            lane_seq,
+            lane_prev,
+            hlc,
+            kind: OpKind::KeyRotate,
+            object_id,
+            nk_wrap: None,
+            nonce,
+            deps: vec![],
+            ct_hash,
+        };
+        let op_id = compute_op_id(&header)?;
+
+        let mut sig_msg = Vec::with_capacity(LABEL_SIG_OP.len() + 32);
+        sig_msg.extend_from_slice(LABEL_SIG_OP.as_bytes());
+        sig_msg.extend_from_slice(op_id.as_bytes());
+        let hybrid_sig = self.signing_keys.sign(&sig_msg);
+
+        let op = Op {
+            v: 1,
+            account_id: self.account_id,
+            device_id: self.device_id,
+            lane_seq,
+            lane_prev,
+            hlc,
+            kind: OpKind::KeyRotate,
+            object_id,
+            nk_wrap: None,
+            nonce,
+            deps: vec![],
+            ct: payload_cbor,
+            sig_ed: hybrid_sig.ed25519,
+            sig_pq: hybrid_sig.ml_dsa,
+        };
+
+        self.storage.insert_op(&op, op_id)?;
+        self.lanes.record_op(&op, op_id)?;
+
+        // Archive current vault key for historical op unwraps (ADR-0002)
+        let slot_name = format!("vault_key_archived_{}", self.previous_vault_keys.len());
+        self.storage
+            .set_keyring_slot(&slot_name, self.vault_key.expose_bytes(), &self.lsk)?;
+        self.previous_vault_keys.push(self.vault_key.clone());
+
+        // Update local vault state and persistent slots
+        self.account_root = new_ar;
+        self.vault_key = new_vk;
+
+        self.storage.set_keyring_slot(
+            "account_root",
+            self.account_root.expose_bytes(),
+            &self.lsk,
+        )?;
+        self.storage
+            .set_keyring_slot("vault_key", self.vault_key.expose_bytes(), &self.lsk)?;
+
+        Ok((op, op_id, phrase))
     }
 }
 

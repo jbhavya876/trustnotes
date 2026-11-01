@@ -22,6 +22,7 @@
 pub mod aead;
 pub mod kat;
 pub mod kdf;
+pub mod kem;
 pub mod keys;
 pub mod labels;
 pub mod padding;
@@ -29,11 +30,16 @@ pub mod recovery;
 pub mod signature;
 
 pub use aead::{
-    open_local, open_note_payload, seal_local, seal_note_payload, unwrap_note_key, wrap_note_key,
+    open_local, open_note_payload, open_raw, seal_local, seal_note_payload, seal_raw,
+    unwrap_note_key, wrap_note_key,
 };
 pub use kdf::{
     derive_account_id, derive_account_root, derive_aik_ed_seed, derive_aik_pq_seed,
     derive_device_id, derive_lsk_from_passphrase, derive_vault_key,
+};
+pub use kem::{
+    decapsulate, encapsulate, HybridCiphertext, HybridKemKeyPair, HybridKemPrivateKey,
+    HybridKemPublicKey,
 };
 pub use keys::{AccountRoot, LocalStorageKey, NoteKey, RecoveryKey, VaultKey};
 pub use padding::{pad, unpad};

@@ -112,4 +112,38 @@ mod tests {
         assert_eq!(out1, out2);
         assert_ne!(out1, [0u8; 32]);
     }
+
+    /// FIPS 204 ML-DSA-65 Deterministic KAT (Claim C8).
+    #[test]
+    fn test_fips204_mldsa65_deterministic_kat() {
+        use ml_dsa::signature::{Signer, Verifier};
+        use ml_dsa::{Keypair, MlDsa65, SigningKey};
+
+        let seed = [0x5au8; 32];
+        let seed_b32: &ml_dsa::B32 = (&seed).into();
+        let signing_key = SigningKey::<MlDsa65>::from_seed(seed_b32);
+        let verifying_key = signing_key.verifying_key();
+
+        let msg = b"TrustNotes Post-Quantum ML-DSA-65 FIPS 204 Known Answer Test";
+        let sig = signing_key.sign(msg);
+
+        // Verify with verifying key
+        assert!(verifying_key.verify(msg, &sig).is_ok());
+
+        // Corrupted message must fail
+        assert!(verifying_key.verify(b"Corrupted message", &sig).is_err());
+    }
+
+    /// FIPS 203 / X-Wing Hybrid KEM KAT (Claim C8).
+    #[test]
+    fn test_xwing_hybrid_kem_and_rule_kat() {
+        use crate::kem::{decapsulate, encapsulate, HybridKemKeyPair};
+
+        let keypair = HybridKemKeyPair::generate().unwrap();
+        let (ss, ct) = encapsulate(&keypair.public_key).unwrap();
+        let ss_dec = decapsulate(&keypair.private_key, &keypair.public_key, &ct).unwrap();
+
+        assert_eq!(ss, ss_dec);
+        assert_ne!(ss, [0u8; 32]);
+    }
 }

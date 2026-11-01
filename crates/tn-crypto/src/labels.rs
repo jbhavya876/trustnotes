@@ -58,6 +58,9 @@ pub const LABEL_RELEASE_LEAF: &str = "tn/v1/release-leaf";
 /// Signature label for reproducible build builder attestations.
 pub const LABEL_BUILDER_SIG: &str = "tn/v1/builder/sig";
 
+/// Domain separation label for account key rotation cross-signatures.
+pub const LABEL_KEY_ROTATE: &str = "tn/v1/key-rotate";
+
 /// Comprehensive slice of all defined context labels.
 pub const ALL_LABELS: &[&str] = &[
     LABEL_ACCOUNT_ROOT,
@@ -77,6 +80,7 @@ pub const ALL_LABELS: &[&str] = &[
     LABEL_EVIDENCE_BUNDLE,
     LABEL_RELEASE_LEAF,
     LABEL_BUILDER_SIG,
+    LABEL_KEY_ROTATE,
 ];
 
 #[cfg(test)]
@@ -93,7 +97,7 @@ mod tests {
                 "duplicate context label detected: {label}"
             );
         }
-        assert_eq!(ALL_LABELS.len(), 17);
+        assert_eq!(ALL_LABELS.len(), 18);
     }
 
     #[test]

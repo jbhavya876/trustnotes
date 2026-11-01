@@ -14,5 +14,6 @@ serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 base64 = "0.22"
 hex = "0.4"
+zeroize = "1.8"
 
 [dev-dependencies]

@@ -118,6 +118,13 @@ impl Sequencer {
             return Err(TnError::HistoryGap);
         }
 
+        // 4b. If KeyRotate op, validate dual cross-signatures before mutating tree
+        if op.kind == tn_types::OpKind::KeyRotate {
+            let payload = tn_types::cbor::decode_canonical::<tn_proto::KeyRotatePayload>(&op.ct)?;
+            let current_aik = db.get_account_aik(op.account_id.as_bytes())?;
+            payload.verify(&current_aik)?;
+        }
+
         // 5. Append to account Merkle tree
         let leaf_hash = *computed_op_id.as_bytes();
         let index = state.tree.append_leaf_hash(leaf_hash);
@@ -182,6 +189,16 @@ impl Sequencer {
                     tn_types::cbor::decode_canonical::<tn_proto::DeviceRevokePayload>(&op.ct)
                 {
                     let _ = db.revoke_device(payload.target_device_id.as_bytes(), index as i64);
+                }
+            }
+            tn_types::OpKind::KeyRotate => {
+                if let Ok(payload) =
+                    tn_types::cbor::decode_canonical::<tn_proto::KeyRotatePayload>(&op.ct)
+                {
+                    let mut new_bundle = Vec::with_capacity(32 + payload.new_aik_pq_pub.len());
+                    new_bundle.extend_from_slice(&payload.new_aik_ed_pub);
+                    new_bundle.extend_from_slice(&payload.new_aik_pq_pub);
+                    let _ = db.update_account_aik(op.account_id.as_bytes(), &new_bundle);
                 }
             }
             _ => {}

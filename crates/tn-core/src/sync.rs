@@ -10,6 +10,7 @@
 //! - S8 Guard: Fewer than k valid witness cosignatures emits `TnError::WitnessPolicy`.
 //! - C1 & C3: All op ciphertexts verified before ingestion.
 
+use serde::{Deserialize, Serialize};
 use tn_crypto::VerifyingKeys;
 use tn_merkle::{verify_consistency, ConsistencyProof, MerkleRoot};
 use tn_proto::{
@@ -53,7 +54,7 @@ pub trait SyncTransport {
 }
 
 /// Summary report emitted after a successful sync cycle.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SyncReport {
     /// Number of local ops pushed to server.
     pub ops_pushed: usize,

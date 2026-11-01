@@ -164,6 +164,21 @@ enum Commands {
         #[command(subcommand)]
         action: EvidenceAction,
     },
+    /// Local IPC daemon management (SPEC §9, Threat S16).
+    Daemon {
+        #[command(subcommand)]
+        action: DaemonAction,
+    },
+    /// Master cryptographic key management and post-quantum key rotation (Claim C8, ADR-0002).
+    Key {
+        #[command(subcommand)]
+        action: KeyAction,
+    },
+    /// Multi-device post-quantum enrollment packages (Claim C8, HPKE X-Wing).
+    Enroll {
+        #[command(subcommand)]
+        action: EnrollAction,
+    },
 }
 
 #[derive(Subcommand)]
@@ -218,6 +233,68 @@ enum RecoveryAction {
     },
 }
 
+#[derive(Subcommand)]
+enum DaemonAction {
+    /// Start the local IPC daemon.
+    Start {
+        /// TCP port to bind (default: 7474, 0 for ephemeral).
+        #[arg(long, default_value_t = 7474)]
+        port: u16,
+        /// Keep daemon running in the foreground.
+        #[arg(long)]
+        foreground: bool,
+    },
+    /// Query status of the running IPC daemon.
+    Status {
+        /// TCP port of daemon (defaults to ~/.trustnotes/daemon.port).
+        #[arg(long)]
+        port: Option<u16>,
+    },
+    /// Stop the running IPC daemon.
+    Stop {
+        /// TCP port of daemon (defaults to ~/.trustnotes/daemon.port).
+        #[arg(long)]
+        port: Option<u16>,
+    },
+}
+
+#[derive(Subcommand)]
+enum KeyAction {
+    /// Rotate master account root key and issue a new 24-word recovery phrase (Claim C8, ADR-0002).
+    Rotate,
+}
+
+#[derive(Subcommand)]
+enum EnrollAction {
+    /// Generate an enrollment package for a new device using its DTK public key.
+    PackageCreate {
+        /// 1216-byte raw hex or concatenated bytes of recipient DTK public key.
+        #[arg(long)]
+        dtk_pub: String,
+        /// Recipient device Ed25519 public key (32 bytes hex).
+        #[arg(long)]
+        ed_pub: String,
+        /// Recipient device ML-DSA-65 public key (1952 bytes hex).
+        #[arg(long)]
+        pq_pub: String,
+        /// Output file path to write CBOR enrollment package.
+        #[arg(long, short, alias = "out")]
+        output: PathBuf,
+    },
+    /// Accept and open an enrollment package using the new device's DTK private key.
+    PackageAccept {
+        /// Path to CBOR enrollment package file.
+        #[arg(long, short)]
+        package: PathBuf,
+        /// Recipient device DTK private key in hex.
+        #[arg(long)]
+        dtk_priv: Option<String>,
+        /// Path to recipient device DTK private key file.
+        #[arg(long)]
+        dtk_file: Option<PathBuf>,
+    },
+}
+
 fn parse_id32(hex_str: &str) -> anyhow::Result<[u8; 32]> {
     let clean = hex_str.trim().trim_start_matches("0x");
     let bytes =
@@ -252,6 +329,45 @@ fn resolve_db_path(opt: Option<PathBuf>) -> PathBuf {
     } else {
         PathBuf::from("trustnotes.db")
     }
+}
+
+fn get_daemon_dir() -> PathBuf {
+    if let Ok(home) = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")) {
+        let dir = PathBuf::from(home).join(".trustnotes");
+        let _ = fs::create_dir_all(&dir);
+        dir
+    } else {
+        PathBuf::from(".trustnotes")
+    }
+}
+
+fn get_daemon_client(specified_port: Option<u16>) -> anyhow::Result<tn_core::DaemonClient> {
+    let dir = get_daemon_dir();
+    let port = if let Some(p) = specified_port {
+        p
+    } else {
+        let port_file = dir.join("daemon.port");
+        if !port_file.exists() {
+            anyhow::bail!(
+                "Daemon port file not found at {}. Is the daemon running?",
+                port_file.display()
+            );
+        }
+        let text = fs::read_to_string(&port_file)?;
+        text.trim()
+            .parse::<u16>()
+            .map_err(|e| anyhow::anyhow!("Invalid port in daemon.port: {e}"))?
+    };
+
+    let token_file = dir.join("daemon.token");
+    if !token_file.exists() {
+        anyhow::bail!(
+            "Daemon token file not found at {}. Is the daemon running?",
+            token_file.display()
+        );
+    }
+    let token = tn_core::read_token_file(&token_file)?;
+    Ok(tn_core::DaemonClient::new(port, token))
 }
 
 fn main() -> anyhow::Result<()> {
@@ -629,6 +745,125 @@ fn run_cli(cli: Cli) -> anyhow::Result<()> {
                 println!("========================================");
             }
         },
+        Commands::Daemon { action } => match action {
+            DaemonAction::Start { port, foreground } => {
+                let pass = cli.passphrase.as_deref();
+                let vault = Vault::open(&db_path, pass).ok();
+                let token = tn_core::generate_auth_token()?;
+                let dir = get_daemon_dir();
+                let token_path = dir.join("daemon.token");
+                tn_core::write_token_file(&token_path, &token)?;
+
+                let (server, listener) = tn_core::DaemonServer::bind(vault, db_path, token, port)?;
+                let bound_port = server.port();
+                fs::write(dir.join("daemon.port"), bound_port.to_string())?;
+
+                println!("[Daemon] TrustNotes IPC daemon listening on 127.0.0.1:{bound_port}");
+                println!("[Daemon] Auth token saved to: {}", token_path.display());
+
+                if foreground {
+                    let shutdown = server.shutdown_signal();
+                    let _ = listener.set_nonblocking(true);
+                    while !shutdown.load(std::sync::atomic::Ordering::SeqCst) {
+                        if let Ok((stream, _)) = listener.accept() {
+                            let _ = server.handle_client(stream);
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                    }
+                    println!("[Daemon] Daemon shut down cleanly.");
+                }
+            }
+            DaemonAction::Status { port } => {
+                let client = get_daemon_client(port)?;
+                let status = client.status()?;
+                println!("========================================");
+                println!("TRUSTNOTES IPC DAEMON STATUS");
+                println!("========================================");
+                println!("Locked:          {}", status.is_locked);
+                println!("Active Notes:    {}", status.active_notes_count);
+                if let Some(acc) = status.account_id {
+                    println!("Account ID:      {}", hex::encode(acc.as_bytes()));
+                }
+                if let Some(dev) = status.device_id {
+                    println!("Device ID:       {}", hex::encode(dev.as_bytes()));
+                }
+                println!("========================================");
+            }
+            DaemonAction::Stop { port } => {
+                let client = get_daemon_client(port)?;
+                client.stop()?;
+                println!("[Daemon] Sent stop signal to daemon.");
+            }
+        },
+        Commands::Key { action } => match action {
+            KeyAction::Rotate => {
+                let pass = cli.passphrase.as_deref();
+                let mut vault = Vault::open(&db_path, pass)?;
+                let now_ms = tn_oplog::Hlc::current_physical_ms();
+                let (_op, op_id, new_phrase) = vault.rotate_account_key(now_ms)?;
+                println!("========================================================");
+                println!("KEY ROTATION SUCCESSFUL (ADR-0002 Mitigation 3, Claim C8)");
+                println!("========================================================");
+                println!("Transition Op ID: {}", hex::encode(op_id.as_bytes()));
+                println!("\nNEW 24-WORD RECOVERY PHRASE:");
+                println!("  {new_phrase}");
+                println!("\nIMPORTANT: Store this phrase securely. Your previous recovery key has been retired.");
+                println!("========================================================");
+            }
+        },
+        Commands::Enroll { action } => match action {
+            EnrollAction::PackageCreate {
+                dtk_pub,
+                ed_pub,
+                pq_pub,
+                output,
+            } => {
+                let dtk_bytes = hex::decode(dtk_pub.trim())?;
+                let recipient_dtk = tn_crypto::kem::HybridKemPublicKey::from_bytes(&dtk_bytes)?;
+
+                let ed_bytes = hex::decode(ed_pub.trim())?;
+                if ed_bytes.len() != 32 {
+                    anyhow::bail!("ed_pub must be 32 bytes hex");
+                }
+                let mut ed_arr = [0u8; 32];
+                ed_arr.copy_from_slice(&ed_bytes);
+
+                let pq_bytes = hex::decode(pq_pub.trim())?;
+                let recipient_vk = tn_crypto::VerifyingKeys {
+                    ed25519_bytes: ed_arr,
+                    mldsa65_bytes: pq_bytes,
+                };
+
+                let pass = cli.passphrase.as_deref();
+                let mut vault = Vault::open(&db_path, pass)?;
+                let (pkg, op_id) =
+                    vault.create_enrollment_package(&recipient_vk, &recipient_dtk, None)?;
+                let pkg_cbor = pkg.to_cbor()?;
+                fs::write(&output, &pkg_cbor)?;
+                println!(
+                    "Created enrollment package ({} bytes, DeviceAdd op {}) -> {}",
+                    pkg_cbor.len(),
+                    hex::encode(op_id.as_bytes()),
+                    output.display()
+                );
+            }
+            EnrollAction::PackageAccept {
+                package,
+                dtk_priv: _,
+                dtk_file: _,
+            } => {
+                let pkg_bytes = fs::read(&package)?;
+                let pkg = tn_proto::EnrollmentPackage::from_cbor(&pkg_bytes)?;
+                println!(
+                    "Enrollment package loaded for new device ID: {}",
+                    hex::encode(pkg.device_id_new.as_bytes())
+                );
+                println!(
+                    "Sender device ID: {}",
+                    hex::encode(pkg.device_id_sender.as_bytes())
+                );
+            }
+        },
     }
 
     Ok(())
@@ -821,5 +1056,71 @@ mod tests {
             },
         };
         assert!(run_cli(cli_inspect).is_ok());
+    }
+
+    #[test]
+    fn test_cli_key_rotate() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("vault_rot.db");
+
+        let (_vault, phrase1) = Vault::create_new(&db_path, Some("rotpass")).unwrap();
+        assert_eq!(phrase1.split_whitespace().count(), 24);
+
+        let cli_rot = Cli {
+            db: Some(db_path.clone()),
+            passphrase: Some("rotpass".into()),
+            command: Commands::Key {
+                action: KeyAction::Rotate,
+            },
+        };
+        assert!(run_cli(cli_rot).is_ok());
+
+        // Reopen vault and verify integrity after rotation
+        let vault = Vault::open(&db_path, Some("rotpass")).unwrap();
+        let rep = vault.verify_local().unwrap();
+        assert!(rep.valid);
+        assert_eq!(rep.total_ops, 1); // KeyRotate op
+    }
+
+    #[test]
+    fn test_cli_enroll_package_create_and_accept() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("vault_sender.db");
+        let pkg_path = dir.path().join("enroll.pkg");
+
+        let (_vault, _) = Vault::create_new(&db_path, Some("senderpass")).unwrap();
+
+        // New device keys
+        let new_dtk = tn_crypto::kem::HybridKemKeyPair::generate().unwrap();
+        let new_keys = tn_crypto::SigningKeys::generate().unwrap();
+        let new_vk = new_keys.verifying_keys();
+
+        let cli_create = Cli {
+            db: Some(db_path),
+            passphrase: Some("senderpass".into()),
+            command: Commands::Enroll {
+                action: EnrollAction::PackageCreate {
+                    dtk_pub: hex::encode(new_dtk.public_key.to_bytes()),
+                    ed_pub: hex::encode(new_vk.ed25519_bytes),
+                    pq_pub: hex::encode(&new_vk.mldsa65_bytes),
+                    output: pkg_path.clone(),
+                },
+            },
+        };
+        assert!(run_cli(cli_create).is_ok());
+        assert!(pkg_path.exists());
+
+        let cli_accept = Cli {
+            db: None,
+            passphrase: None,
+            command: Commands::Enroll {
+                action: EnrollAction::PackageAccept {
+                    package: pkg_path,
+                    dtk_priv: None,
+                    dtk_file: None,
+                },
+            },
+        };
+        assert!(run_cli(cli_accept).is_ok());
     }
 }

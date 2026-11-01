@@ -26,6 +26,12 @@ pub use release::{
     verify_binary_authenticity, BuilderAttestation, ReleaseEntry, ReleaseLog, ReleaseLogManifest,
 };
 
+pub mod enrollment;
+pub use enrollment::{EnrollmentPackage, EnrollmentPayload};
+
+pub mod key_rotate;
+pub use key_rotate::KeyRotatePayload;
+
 /// Maximum allowed clock skew in milliseconds (60 seconds per SPEC §6.1).
 pub const MAX_CLOCK_SKEW_MS: u64 = 60_000;
 

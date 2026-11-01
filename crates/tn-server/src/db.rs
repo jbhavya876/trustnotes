@@ -171,6 +171,45 @@ impl ServerDb {
         Ok(())
     }
 
+    /// Fetches the Account Identity Key bundle.
+    pub fn get_account_aik(
+        &self,
+        account_id: &[u8; 32],
+    ) -> Result<tn_crypto::VerifyingKeys, TnError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT aik_pub_bundle FROM accounts WHERE account_id = ?1")
+            .map_err(|e| TnError::Internal(format!("Prepare get_account_aik: {e}")))?;
+        let bundle: Vec<u8> = stmt
+            .query_row(params![account_id.as_slice()], |row| row.get(0))
+            .map_err(|e| TnError::Internal(format!("Account not found: {e}")))?;
+        if bundle.len() < 32 {
+            return Err(TnError::Internal("Corrupted AIK bundle".into()));
+        }
+        let mut ed25519_bytes = [0u8; 32];
+        ed25519_bytes.copy_from_slice(&bundle[0..32]);
+        let mldsa65_bytes = bundle[32..].to_vec();
+        Ok(tn_crypto::VerifyingKeys {
+            ed25519_bytes,
+            mldsa65_bytes,
+        })
+    }
+
+    /// Updates the Account Identity Key bundle after verified rotation.
+    pub fn update_account_aik(
+        &self,
+        account_id: &[u8; 32],
+        new_bundle: &[u8],
+    ) -> Result<(), TnError> {
+        self.conn
+            .execute(
+                "UPDATE accounts SET aik_pub_bundle = ?1 WHERE account_id = ?2",
+                params![new_bundle, account_id.as_slice()],
+            )
+            .map_err(|e| TnError::Internal(format!("Update account aik error: {e}")))?;
+        Ok(())
+    }
+
     /// Enrolls a device under an account.
     pub fn insert_device(
         &self,

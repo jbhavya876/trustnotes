@@ -66,6 +66,7 @@ impl fmt::Debug for AccountRoot {
 }
 
 /// The Vault Key (VK) derived via HKDF(AR, "tn/v1/vault-key").
+#[derive(Clone)]
 pub struct VaultKey(pub(crate) [u8; 32]);
 
 impl VaultKey {
