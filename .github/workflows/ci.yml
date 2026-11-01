@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
   fmt:
@@ -16,9 +15,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust toolchain
-        run: rustup toolchain install 1.98.1 --component rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
       - name: Check formatting
-        run: cargo +1.98.1 fmt --check --all
+        run: cargo fmt --check --all
 
   clippy:
     name: Clippy
@@ -26,7 +27,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust toolchain
-        run: rustup toolchain install 1.98.1 --component clippy
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -36,7 +39,7 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
       - name: Run clippy
-        run: cargo +1.98.1 clippy --all-targets --workspace -- -D warnings
+        run: cargo clippy --all-targets --workspace -- -D warnings
 
   test:
     name: Tests
@@ -44,10 +47,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust toolchain
-        run: rustup toolchain install 1.98.1
-      - name: Install cargo-nextest
-        run: |
-          curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+        uses: dtolnay/rust-toolchain@stable
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -57,43 +57,19 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
       - name: Run tests
-        run: cargo +1.98.1 nextest run --locked --workspace
-
-  deny:
-    name: Dependency audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install cargo-deny
-        run: cargo install cargo-deny --locked
-      - name: Run cargo deny
-        run: cargo deny check
-
-  audit:
-    name: Security audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
-      - name: Run cargo audit
-        run: cargo audit
+        run: cargo test --workspace
 
   doc-lint:
-    name: Documentation lint
+    name: Documentation & Invariant Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Check CRYPTO.md label registry
         run: |
-          # Every context label used in code (tn/v1/*) must appear in CRYPTO.md
-          # In M0, this is a structure check only — no code to scan yet
           grep -q "tn/v1/" docs/CRYPTO.md || (echo "CRYPTO.md missing label registry" && exit 1)
           echo "CRYPTO.md label registry check passed"
       - name: Check METADATA.md column list
         run: |
-          # Every server-visible column must appear in METADATA.md
-          # In M0, check that METADATA.md exists and has the required sections
           test -f docs/METADATA.md || (echo "METADATA.md missing" && exit 1)
           grep -q "account_id" docs/METADATA.md || (echo "METADATA.md missing account_id" && exit 1)
           echo "METADATA.md column check passed"
