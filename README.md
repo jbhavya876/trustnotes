@@ -3,7 +3,7 @@
 > **The End-to-End Encrypted, Transparency-Log-Backed, Multi-Device Verifiable Notebook**
 
 [![CI Build](https://github.com/jbhavya876/trustnotes/actions/workflows/ci.yml/badge.svg)](https://github.com/jbhavya876/trustnotes/actions)
-[![License](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
+[![License](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.70%2B-orange.svg)](https://www.rust-lang.org)
 [![Post-Quantum](https://img.shields.io/badge/Post--Quantum-FIPS%20203%20%2F%20FIPS%20204-success.svg)](docs/CRYPTO.md)
 [![Safety](https://img.shields.io/badge/unsafe-forbid-brightgreen.svg)](docs/SECURITY.md)
@@ -173,7 +173,7 @@ TrustNotes enforces non-negotiable **Stop-Ship Conditions** detailed in [`docs/S
 ## License
 
 Dual-licensed under either:
-- **MIT License** ([LICENSE-MIT](LICENSE-MIT))
+- **MIT License** ([LICENSE](LICENSE))
 - **Apache License, Version 2.0** ([LICENSE-APACHE](LICENSE-APACHE))
 
 at your option.
